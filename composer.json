@@ -1,0 +1,25 @@
+{
+  "name": "optima/depot-stock",
+  "version": "1.0.2",
+  "description": "Depot Stock Management core (Laravel 11/12).",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.2",
+    "illuminate/support": "^12.0|^11.0",
+    "illuminate/database": "^12.0|^11.0",
+    "illuminate/routing": "^12.0|^11.0",
+    "illuminate/view": "^12.0|^11.0",
+    "livewire/livewire": "^3.0"
+  },
+  "autoload": {
+    "psr-4": { "Optima\\DepotStock\\": "src/" }
+  },
+  "extra": {
+    "laravel": {
+      "providers": ["Optima\\DepotStock\\DepotStockServiceProvider"]
+    }
+  }
+}
+
+
