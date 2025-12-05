@@ -76,9 +76,9 @@
       </div>
 
       <nav class="flex items-center gap-2">
-        <a href="{{ route('depot.clients.index') }}"
-           class="hidden md:inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50">
-          ← Back
+        <a href="{{ url()->previous() }}"
+         class="hidden md:inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50">
+        ← Back
         </a>
       </nav>
     </div>

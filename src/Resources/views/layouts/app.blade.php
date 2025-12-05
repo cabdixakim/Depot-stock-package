@@ -28,6 +28,8 @@
     $isAdmin     = in_array('admin', $roleNames) || in_array('owner', $roleNames) || in_array('superadmin', $roleNames);
     $isOps       = in_array('operations', $roleNames) || in_array('ops', $roleNames);
     $isAccounts  = in_array('accounts', $roleNames) || in_array('accounting', $roleNames);
+
+    $isPureOps   = $isOps && ! $isAdmin && ! $isAccounts;
   @endphp
 
   @php
@@ -49,46 +51,73 @@
   <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
     <div class="mx-auto max-w-7xl px-4 md:px-6 h-14 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <a href="{{ route('depot.dashboard') }}"
-           class="inline-flex items-center gap-2 font-semibold text-gray-900">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
+        {{-- Mobile menu toggle (left) --}}
+        <button
+          id="mobileNavToggle"
+          type="button"
+          class="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white p-1.5 text-gray-600 hover:bg-gray-50 md:hidden"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M3 6.25C3 5.84 3.34 5.5 3.75 5.5h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.25zm0 4c0-.41.34-.75.75-.75h12.5a.75.75 0 010 1.5H3.75A.75.75 0 013 10.25zm0 4c0-.41.34-.75.75-.75h8.5a.75.75 0 010 1.5h-8.5A.75.75 0 013 14.25z" />
           </svg>
-          Depot Stock
-        </a>
+        </button>
 
-        {{-- Main nav gated by roles --}}
-        <nav class="hidden md:flex items-center gap-1">
-          {{-- Everyone --}}
-          <a href="{{ route('depot.dashboard') }}" class="navlink">Dashboard</a>
-
-          {{-- Ops + Accounts + Admin --}}
-          @if($isAdmin || $isAccounts || $isOps )
-            <a href="{{ route('depot.clients.index') }}" class="navlink">Clients</a>
-          @endif
-          @if( $isAccounts || $isAdmin)
-            <a href="{{ route('depot.invoices.index') }}" class="navlink">Invoices</a>
-            <a href="{{ route('depot.payments.index') }}" class="navlink">Payments</a>
-          @endif
-
-          {{-- Admin only --}}
-          @if($isAdmin || $isAccounts)
-            <a href="{{ route('depot.pool.index') }}" class="navlink">Depot Pool</a>
-          @endif
-
-          {{-- Tank Dips --}}
-          <a href="{{ route('depot.dips.index') }}"
-             class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm
-                    transition
-                    {{ request()->routeIs('depot.dips.*')
-                        ? 'bg-gray-900 text-white shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
-            <svg class="h-4 w-4 {{ request()->routeIs('depot.dips.*') ? 'text-white' : 'text-gray-400' }}"
-                 viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M12 3.5C9 8 6 10.5 6 14a6 6 0 0 0 12 0c0-3.5-3-6-6-10.5z" />
+        {{-- Brand: centred on mobile, normal on md+ --}}
+        @if($isPureOps)
+          <span
+            class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
             </svg>
-            <span class="truncate">Tank Dips</span>
+            Depot Stock
+          </span>
+        @else
+          <a href="{{ route('depot.dashboard') }}"
+             class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
+            </svg>
+            Depot Stock
+          </a>
+        @endif
+
+        {{-- Main nav gated by roles (desktop only) --}}
+        <nav class="hidden md:flex items-center gap-1">
+          @unless($isPureOps)
+            {{-- Everyone --}}
+            <a href="{{ route('depot.dashboard') }}" class="navlink">Dashboard</a>
+
+            {{-- Ops + Accounts + Admin --}}
+            @if($isAdmin || $isAccounts || $isOps )
+              <a href="{{ route('depot.clients.index') }}" class="navlink">Clients</a>
+            @endif
+
+            {{-- Accounts + Admin --}}
+            @if($isAccounts || $isAdmin)
+              <a href="{{ route('depot.invoices.index') }}" class="navlink">Invoices</a>
+              <a href="{{ route('depot.payments.index') }}" class="navlink">Payments</a>
+            @endif
+
+            {{-- Admin + Accounts --}}
+            @if($isAdmin || $isAccounts)
+              <a href="{{ route('depot.pool.index') }}" class="navlink">Depot Pool</a>
+            @endif
+          @endunless
+
+          {{-- Tank Dips / Depot operations (always visible) --}}
+          @php
+            $isDepotOps = str_starts_with(request()->route()?->getName() ?? '', 'depot.operations.');
+          @endphp
+
+          <a href="{{ route('depot.operations.index') }}"
+             class="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium
+                {{ $isDepotOps ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+            <svg class="h-4 w-4 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M4 7h16M4 12h10M4 17h7M17 10l3 2-3 2" />
+            </svg>
+            <span>Depot operations</span>
           </a>
         </nav>
       </div>
@@ -97,64 +126,66 @@
         {{-- Quick search slot (optional) --}}
         @yield('topbar-search')
 
-        {{-- Custom Depot dropdown (shown for all users) --}}
-        <div id="depotDropdown" class="hidden md:flex items-center gap-2 mr-2">
-          <span class="text-[11px] uppercase tracking-wide text-gray-400">Depot</span>
+        {{-- Custom Depot dropdown (hidden for pure ops) --}}
+        @unless($isPureOps)
+          <div id="depotDropdown" class="hidden md:flex items-center gap-2 mr-2">
+            <span class="text-[11px] uppercase tracking-wide text-gray-400">Depot</span>
 
-          <div class="relative">
-            <button id="depotDropdownBtn"
-                    type="button"
-                    class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 pl-3 pr-2 py-1.5 text-xs font-medium text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-semibold text-white">
-                {{ mb_substr($activeDepotName,0,1) }}
-              </span>
-              <span class="max-w-[10rem] truncate">
-                {{ $activeDepotName }}
-              </span>
-              <svg class="h-3 w-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M5.25 7.5L10 12.25 14.75 7.5H5.25z"/>
-              </svg>
-            </button>
-
-            <div id="depotDropdownMenu"
-                 class="hidden absolute right-0 mt-2 w-56 rounded-xl border border-gray-200 bg-white shadow-lg py-1 text-xs z-50">
-              <button type="button"
-                      data-depot-id="all"
-                      class="flex w-full items-center justify-between px-3 py-2 hover:bg-gray-50">
-                <span class="flex items-center gap-2">
-                  <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-[10px] font-semibold text-white">
-                    *
-                  </span>
-                  <span>All Depots</span>
+            <div class="relative">
+              <button id="depotDropdownBtn"
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 pl-3 pr-2 py-1.5 text-xs font-medium text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-semibold text-white">
+                  {{ mb_substr($activeDepotName,0,1) }}
                 </span>
-                @if(!$activeDepotId)
-                  <span class="text-[10px] text-emerald-600 font-semibold">Active</span>
-                @endif
+                <span class="max-w-[10rem] truncate">
+                  {{ $activeDepotName }}
+                </span>
+                <svg class="h-3 w-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M5.25 7.5L10 12.25 14.75 7.5H5.25z"/>
+                </svg>
               </button>
 
-              <div class="my-1 h-px bg-gray-100"></div>
-
-              @foreach($depotsHdr as $d)
+              <div id="depotDropdownMenu"
+                   class="hidden absolute right-0 mt-2 w-56 rounded-xl border border-gray-200 bg-white shadow-lg py-1 text-xs z-50">
                 <button type="button"
-                        data-depot-id="{{ $d->id }}"
+                        data-depot-id="all"
                         class="flex w-full items-center justify-between px-3 py-2 hover:bg-gray-50">
                   <span class="flex items-center gap-2">
-                    <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600/90 text-[10px] font-semibold text-white">
-                      {{ mb_substr($d->name,0,1) }}
+                    <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-[10px] font-semibold text-white">
+                      *
                     </span>
-                    <span class="truncate max-w-[8rem]">{{ $d->name }}</span>
+                    <span>All Depots</span>
                   </span>
-                  @if($activeDepotId == $d->id)
+                  @if(!$activeDepotId)
                     <span class="text-[10px] text-emerald-600 font-semibold">Active</span>
                   @endif
                 </button>
-              @endforeach
+
+                <div class="my-1 h-px bg-gray-100"></div>
+
+                @foreach($depotsHdr as $d)
+                  <button type="button"
+                          data-depot-id="{{ $d->id }}"
+                          class="flex w-full items-center justify-between px-3 py-2 hover:bg-gray-50">
+                    <span class="flex items-center gap-2">
+                      <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600/90 text-[10px] font-semibold text-white">
+                        {{ mb_substr($d->name,0,1) }}
+                      </span>
+                      <span class="truncate max-w-[8rem]">{{ $d->name }}</span>
+                    </span>
+                    @if($activeDepotId == $d->id)
+                      <span class="text-[10px] text-emerald-600 font-semibold">Active</span>
+                    @endif
+                  </button>
+                @endforeach
+              </div>
             </div>
           </div>
-        </div>
+        @endunless
 
-        {{-- Settings button (admin only) --}}
-        @if($isAdmin)
+        {{-- Settings button (admin only, not pure ops) --}}
+        @if($isAdmin && ! $isPureOps)
           <button id="openSettings"
                   class="hidden sm:inline-flex rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50">
             Settings
@@ -164,7 +195,7 @@
         {{-- Divider --}}
         <span class="hidden sm:inline-block h-5 w-px bg-gray-200 mx-1"></span>
 
-        {{-- User chip + dropdown --}}
+        {{-- User chip + dropdown (always) --}}
         <div class="relative" id="userMenuRoot">
           <button id="userMenuBtn"
                   class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2.5 py-1.5 hover:bg-gray-50">
@@ -202,6 +233,31 @@
             </form>
           </div>
         </div>
+      </div>
+    </div>
+
+    {{-- Mobile collapsible nav --}}
+    <div id="mobileNavPanel" class="md:hidden hidden border-t border-gray-100 bg-white">
+      <div class="mx-auto max-w-7xl px-4 py-2 space-y-1 text-sm">
+        @unless($isPureOps)
+          <a href="{{ route('depot.dashboard') }}" class="navlink block">Dashboard</a>
+
+          @if($isAdmin || $isAccounts || $isOps )
+            <a href="{{ route('depot.clients.index') }}" class="navlink block">Clients</a>
+          @endif
+
+          @if($isAccounts || $isAdmin)
+            <a href="{{ route('depot.invoices.index') }}" class="navlink block">Invoices</a>
+            <a href="{{ route('depot.payments.index') }}" class="navlink block">Payments</a>
+          @endif
+
+          @if($isAdmin || $isAccounts)
+            <a href="{{ route('depot.pool.index') }}" class="navlink block">Depot Pool</a>
+          @endif
+        @endunless
+
+        {{-- Depot operations always --}}
+        <a href="{{ route('depot.operations.index') }}" class="navlink block">Depot operations</a>
       </div>
     </div>
   </header>
@@ -533,27 +589,21 @@
   <script>
     // ---------- Topbar active link style ----------
     (function() {
-      const path = location.pathname; // e.g. "/depot/dashboard"
-
+      const path = location.pathname;
       document.querySelectorAll('.navlink').forEach(a => {
         const href = a.getAttribute('href') || '';
+        const isActive = href && path.startsWith(href);
+        a.className = 'navlink ' + (isActive ? 'navlink--active' : '');
+      });
+    })();
 
-        if (!href) return;
-
-        // Normalize to a pathname: "/depot/dashboard"
-        let hrefPath;
-        try {
-          hrefPath = new URL(href, window.location.origin).pathname;
-        } catch (e) {
-          hrefPath = href;
-        }
-
-        // Match exact or "starts with" for index routes
-        const isActive =
-          hrefPath !== '/' &&
-          (path === hrefPath || path.startsWith(hrefPath + '/'));
-
-        a.classList.toggle('navlink--active', !!isActive);
+    // ---------- Mobile nav toggle ----------
+    (function () {
+      const btn   = document.getElementById('mobileNavToggle');
+      const panel = document.getElementById('mobileNavPanel');
+      if (!btn || !panel) return;
+      btn.addEventListener('click', () => {
+        panel.classList.toggle('hidden');
       });
     })();
 
@@ -634,6 +684,8 @@
     (function () {
       const modal   = document.getElementById('settingsModal');
       const openBtn = document.getElementById('openSettings');
+      if (!modal || !openBtn) return;
+
       const closeEls= modal.querySelectorAll('[data-close-settings]');
       const form    = document.getElementById('settingsForm');
       const input   = document.getElementById('pm_margin');
@@ -843,30 +895,30 @@
   </script>
 
   @push('scripts')
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // Safety: ensure any overlay starts hidden
-      ['recordPaymentModal', 'applyCreditModal', 'movementsGridModal'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && !el.classList.contains('hidden')) {
-          el.classList.add('hidden');
-        }
-      });
-    });
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Safety: ensure any overlay starts hidden
+  ['recordPaymentModal', 'applyCreditModal', 'movementsGridModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.classList.contains('hidden')) {
+      el.classList.add('hidden');
+    }
+  });
+});
 
-    // Global panic button: ESC closes any visible full-screen overlay
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
-      document.querySelectorAll('.fixed.inset-0')
-        .forEach(el => {
-          // Only hide overlays, not your whole layout
-          if (el.id && (el.id.includes('Modal') || el.dataset.overlay === 'backdrop')) {
-            el.classList.add('hidden');
-          }
-        });
+// Global panic button: ESC closes any visible full-screen overlay
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.fixed.inset-0')
+    .forEach(el => {
+      // Only hide overlays, not your whole layout
+      if (el.id && (el.id.includes('Modal') || el.dataset.overlay === 'backdrop')) {
+        el.classList.add('hidden');
+      }
     });
-  </script>
-  @endpush
+});
+</script>
+@endpush
 
   {{-- JS bundle at end --}}
   @vite(['resources/js/app.js'])
@@ -877,35 +929,13 @@
   {{-- Inline small CSS for navlink --}}
   <style>
     .navlink {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0.45rem 0.9rem;
-      border-radius: 0.75rem;
-      font-size: 0.875rem;
-      font-weight: 500;
+      padding: .5rem .75rem;
+      border-radius: .75rem;
+      font-size: .875rem;
       color: #6b7280; /* gray-500 */
-      transition:
-        background-color 150ms ease,
-        color 150ms ease,
-        box-shadow 150ms ease,
-        transform 120ms ease;
     }
-
-    .navlink:hover {
-      color: #111827;
-      background: #F3F4F6; /* gray-100 */
-      transform: translateY(-0.5px);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-    }
-
-    .navlink--active {
-      color: #F9FAFB;
-      background: #111827;
-      font-weight: 600;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
-    }
+    .navlink:hover { color:#111827; background:#F3F4F6; }
+    .navlink--active { color:#111827; background:#EEF2FF; } /* indigo-50 */
   </style>
 
   <script>

@@ -26,6 +26,11 @@ use Optima\DepotStock\Http\Controllers\TankController;
 use Optima\DepotStock\Http\Controllers\Settings\AccountController;
 use Optima\DepotStock\Http\Controllers\Portal\ClientPortalController;
 
+// ✅ NEW: Depot operations controllers
+use Optima\DepotStock\Http\Controllers\DepotOperationsController;
+use Optima\DepotStock\Http\Controllers\DepotReconController;
+use Optima\DepotStock\Http\Controllers\OperationsClientController;
+
 // =========================================================
 // STAFF AREA (/depot/...)
 // =========================================================
@@ -114,12 +119,41 @@ Route::middleware(['web', 'auth'])
                 });
         });
 
+        // =================================================================
+        // DEPOT OPERATIONS SHELL (Dashboard + Daily dips + Simple history + Ops clients)
+        // =================================================================
+        Route::prefix('operations')->name('operations.')->group(function () {
+            // Main shell / dashboard
+            Route::get('/', [DepotOperationsController::class, 'index'])
+                ->name('index');
+
+            // Daily dips (new reconciliation engine)
+            Route::get('/daily-dips', [DepotReconController::class, 'index'])
+                ->name('daily-dips');
+
+            // Save opening / closing dips for a depot + date (current tank is passed in form)
+            Route::post('/daily-dips/{depot}/{date}/opening', [DepotReconController::class, 'storeOpening'])
+                ->name('daily-dips.store-opening');
+
+            Route::post('/daily-dips/{depot}/{date}/closing', [DepotReconController::class, 'storeClosing'])
+                ->name('daily-dips.store-closing');
+            
+            Route::post('/daily-dips/{depot}/{date}/lock', [DepotReconController::class, 'lockDay'])
+                ->name('daily-dips.lock');
+
+            Route::get('/operations/dips-history', [DepotOperationsController::class, 'dipsHistory'])
+             ->name('dips-history');
+            // Operations client list (lean)
+            Route::get('/clients', [OperationsClientController::class, 'index'])
+                ->name('clients.index');
+        });
+
         // ---------------- Dips (Daily tank dips per depot) ----------------
-        // ---------------- Dips (Daily tank dips) ----------------
         Route::get('/dips',            [DipController::class, 'index'])->name('dips.index');
         Route::post('/dips',           [DipController::class, 'store'])->name('dips.store');
         Route::get('/dips/export',     [DipController::class, 'export'])->name('dips.export');
         Route::get('/dips/{dip}',      [DipController::class, 'show'])->name('dips.show');
+
         // =================================================================
         // DEPOT POOL – admin + accountant
         // =================================================================
@@ -147,7 +181,6 @@ Route::middleware(['web', 'auth'])
             Route::post('/settings/users/{user}/reset', [UserController::class, 'resetPassword'])->name('settings.users.reset');
             Route::post('/settings/users/{user}/basic', [UserController::class, 'updateBasic'])->name('settings.users.basic');
 
-            
             // ---------------- Depot policies (global settings) ----------------
             Route::post('/settings/depot-policies', [DepotController::class, 'savePolicies'])
                 ->name('policies.save');

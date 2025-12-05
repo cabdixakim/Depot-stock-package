@@ -56,36 +56,26 @@
       </form>
     </div>
 
-    {{-- EXPORT (single button, above lists) --}}
+    {{-- EXPORT: pill-style buttons --}}
     <div class="flex justify-end mt-1 mb-3">
-      <details id="exportDropdown" class="relative inline-block text-left" data-export-dropdown>
-        <summary
-          class="flex items-center gap-2 cursor-pointer rounded-lg bg-emerald-500/10 border border-emerald-400/60 px-3 py-1.5 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/20 list-none">
-          <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20">
-            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M5 20h14v-2H5v2zm7-2l5-6h-3V4h-4v8H7l5 6z"/>
-            </svg>
-          </span>
-          <span>Download movements</span>
-          <svg class="h-3 w-3 text-emerald-300" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08-1.06z" clip-rule="evenodd" />
+      <div class="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-slate-900/80 px-2.5 py-1.5 text-[11px]">
+        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15">
+          <svg class="h-3 w-3 text-emerald-300" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M5 20h14v-2H5v2zm7-2l5-6h-3V4h-4v8H7l5 6z"/>
           </svg>
-        </summary>
+        </span>
+        <span class="uppercase tracking-wide text-emerald-200/80 mr-1">Export</span>
 
-        <div
-          class="absolute right-0 mt-2 w-44 rounded-xl border border-slate-700 bg-slate-950 shadow-2xl text-xs overflow-hidden z-40">
-          <a href="{{ $baseExportUrl . ($exportQuery ? '&' : '?') . 'format=csv' }}"
-             class="flex items-center gap-2 px-3 py-2 hover:bg-slate-800 text-slate-100">
-            <span class="h-1.5 w-1.5 rounded-full bg-sky-400"></span>
-            <span>CSV (Excel &amp; others)</span>
-          </a>
-          <a href="{{ $baseExportUrl . ($exportQuery ? '&' : '?') . 'format=xls' }}"
-             class="flex items-center gap-2 px-3 py-2 hover:bg-slate-800 text-slate-100 border-t border-slate-800/70">
-            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-            <span>Excel (.xls)</span>
-          </a>
-        </div>
-      </details>
+        <a href="{{ $baseExportUrl . ($exportQuery ? '&' : '?') . 'format=csv' }}"
+           class="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-medium text-slate-100 hover:bg-slate-800">
+          CSV
+        </a>
+
+        <a href="{{ $baseExportUrl . ($exportQuery ? '&' : '?') . 'format=xls' }}"
+           class="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-emerald-700">
+          Excel
+        </a>
+      </div>
     </div>
 
     {{-- MAIN GRID: Offloads + Loads --}}
@@ -291,7 +281,7 @@
                     <span class="group-open:hidden inline-flex items-center gap-1">
                       <span>See details</span>
                       <svg class="h-3 w-3 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 011.08 1.04l-4.25 4.5a.75.75 0 01-1.08-1.06z" clip-rule="evenodd" />
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08-1.06z" clip-rule="evenodd" />
                       </svg>
                     </span>
                     <span class="hidden group-open:inline-flex items-center gap-1">
@@ -366,16 +356,6 @@
 
 @push('scripts')
 <script>
-  (function () {
-    const dropdown = document.querySelector('[data-export-dropdown]');
-    if (!dropdown) return;
-
-    document.addEventListener('click', function (e) {
-      if (!dropdown.open) return;
-      if (!dropdown.contains(e.target)) {
-        dropdown.open = false;
-      }
-    });
-  })();
+  // no dropdown any more, leaving stack in case you add interactions later
 </script>
 @endpush

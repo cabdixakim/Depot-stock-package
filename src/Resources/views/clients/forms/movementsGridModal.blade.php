@@ -74,21 +74,29 @@
         {{-- Action Bar --}}
         <div class="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-white/60 px-2.5 py-2 backdrop-blur relative z-[300]">
 
-          {{-- Export dropdown --}}
-          <div class="relative">
-            <button type="button" id="mvmExportBtn"
-              class="inline-flex items-center gap-2 rounded-md bg-emerald-600 text-white px-3 py-1.5 text-xs hover:bg-emerald-700">
-              Export
-              <svg class="h-3.5 w-3.5 opacity-90" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9l6 6 6-6"/>
-              </svg>
+          {{-- Export pills (client-side, Tabulator) --}}
+          <div class="inline-flex items-center gap-1">
+            <span class="text-[10px] uppercase tracking-wide text-gray-400 mr-1">Export</span>
+
+            <button type="button" id="mvmExpCopy"
+                    class="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
+              Copy
             </button>
-            <div id="mvmExportMenu"
-                 class="hidden absolute mt-1 w-40 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-[12px]">
-              <button type="button" data-exp="csv"  class="block w-full text-left px-2 py-1 rounded hover:bg-gray-50">CSV</button>
-              <button type="button" data-exp="xlsx" class="block w-full text-left px-2 py-1 rounded hover:bg-gray-50">Excel</button>
-              <!-- <button type="button" data-exp="pdf"  class="block w-full text-left px-2 py-1 rounded hover:bg-gray-50">PDF</button> -->
-            </div>
+
+            <button type="button" id="mvmExpCsv"
+                    class="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
+              CSV
+            </button>
+
+            <button type="button" id="mvmExpXlsx"
+                    class="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-medium shadow-sm hover:bg-emerald-700">
+              Excel
+            </button>
+
+            <button type="button" id="mvmExpPdf"
+                    class="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
+              PDF
+            </button>
           </div>
 
           {{-- Save changes (ADMIN ONLY) --}}
@@ -174,8 +182,6 @@
   // Routes
   const dataUrl = @json(route('depot.clients.movements.data', $client));
   const saveUrl = @json(route('depot.clients.movements.save', $client));
-  const exportOffUrl = @json(route('depot.clients.offloads.export', $client));
-  const exportLoadUrl = @json(route('depot.clients.loads.export', $client));
 
   // DOM
   const modal = document.getElementById('movementsModal');
@@ -184,8 +190,12 @@
   const elSearch = document.getElementById('mvmSearch');
   const btnSave = document.getElementById('mvmBtnSave');
   const tabs = modal.querySelectorAll('.mvm-tab');
-  const exportBtn = document.getElementById('mvmExportBtn');
-  const exportMenu = document.getElementById('mvmExportMenu');
+
+  // Export buttons (Tabulator client-side)
+  const btnCopy = document.getElementById('mvmExpCopy');
+  const btnCsv  = document.getElementById('mvmExpCsv');
+  const btnXlsx = document.getElementById('mvmExpXlsx');
+  const btnPdf  = document.getElementById('mvmExpPdf');
 
   // Confirm modal
   const cf = document.getElementById('mvmConfirm');
@@ -204,6 +214,14 @@
   // Formatters
   const nf = new Intl.NumberFormat('en-US',{maximumFractionDigits:3});
   const fmt = v => (v==null || v==='') ? '' : nf.format(+v);
+
+  // simple helper to build export filename
+  function buildExportName(ext){
+    const from = document.getElementById('mvmFrom')?.value || 'all';
+    const to   = document.getElementById('mvmTo')?.value || 'all';
+    const base = `movements_${currentKind}_${from}_${to}`.replace(/[^0-9A-Za-z_-]+/g,'-');
+    return `${base}.${ext}`;
+  }
 
   // Created By chip formatter (defensive on field names)
   function createdByFormatter(cell){
@@ -523,25 +541,27 @@
     loadData();
   });
 
-  // ===== Export dropdown =====
-  exportBtn?.addEventListener('click', ()=>{
-    exportMenu.classList.toggle('hidden');
+  // ===== Export buttons (Tabulator client-side) =====
+  btnCopy?.addEventListener('click', ()=>{
+    if (!table) return;
+    table.copyToClipboard();
   });
-  document.addEventListener('click', (e)=>{
-    if(!exportMenu.contains(e.target) && e.target!==exportBtn) exportMenu.classList.add('hidden');
+
+  btnCsv?.addEventListener('click', ()=>{
+    if (!table) return;
+    table.download("csv", buildExportName('csv'));
   });
-  exportMenu?.querySelectorAll('[data-exp]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const kind = currentKind;
-      const from = document.getElementById('mvmFrom')?.value || '';
-      const to   = document.getElementById('mvmTo')?.value || '';
-      const base = (kind==='loads') ? exportLoadUrl : exportOffUrl;
-      const url = new URL(base, window.location.origin);
-      if(from) url.searchParams.set('from', from);
-      if(to)   url.searchParams.set('to', to);
-      url.searchParams.set('format', btn.dataset.exp);
-      window.open(url.toString(), '_blank');
-      exportMenu.classList.add('hidden');
+
+  btnXlsx?.addEventListener('click', ()=>{
+    if (!table) return;
+    table.download("xlsx", buildExportName('xlsx'));
+  });
+
+  btnPdf?.addEventListener('click', ()=>{
+    if (!table) return;
+    table.download("pdf", buildExportName('pdf'), {
+      orientation: "landscape",
+      title: currentKind === 'offloads' ? "Client offloads" : "Client loads",
     });
   });
 

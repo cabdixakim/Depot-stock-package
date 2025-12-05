@@ -103,7 +103,7 @@
       {{-- Record Payment --}}
       @if(!$isSettled)
         <button id="btnRecordPayment"
-                class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm">
+                class="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm shadow-sm">
           Record Payment
         </button>
       @endif
@@ -111,7 +111,7 @@
       {{-- Apply Credit --}}
       @if(!$isSettled && $hasCredit)
         <button id="btnApplyCredit"
-                class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 text-sm">
+                class="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 text-sm shadow-sm">
           Apply Credit
         </button>
       @endif
@@ -184,16 +184,28 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-3">
-          <button type="button"
-                  id="btnExportOffloads"
-                  class="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-3 py-1.5 text-xs shadow hover:bg-slate-800">
-            <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M3 14.25A2.25 2.25 0 0 0 5.25 16.5h9.5A2.25 2.25 0 0 0 17 14.25V12a.75.75 0 0 0-1.5 0v2.25a.75.75 0 0 1-.75.75h-9.5a.75.75 0 0 1-.75-.75V12A.75.75 0 0 0 3 12v2.25Z"/>
-              <path d="M10 12.5a.75.75 0 0 0 .53-.22l3-3a.75.75 0 0 0-1.06-1.06L10.75 9.94V3.5a.75.75 0 0 0-1.5 0v6.44L7.53 8.22A.75.75 0 0 0 6.47 9.28l3 3A.75.75 0 0 0 10 12.5Z"/>
-            </svg>
-            <span>Export CSV</span>
-          </button>
+        <div class="flex items-center gap-2">
+          @if($offloadRows->count())
+            <div class="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white px-2.5 py-1 shadow">
+              <button type="button"
+                      id="btnOffloadsCsv"
+                      class="text-[11px] px-1.5 py-0.5 rounded-full hover:bg-slate-800">
+                CSV
+              </button>
+              <span class="h-3 w-px bg-slate-700"></span>
+              <button type="button"
+                      id="btnOffloadsXlsx"
+                      class="text-[11px] px-1.5 py-0.5 rounded-full hover:bg-emerald-500/20">
+                Excel
+              </button>
+              <span class="h-3 w-px bg-slate-700"></span>
+              <button type="button"
+                      id="btnOffloadsPdf"
+                      class="text-[11px] px-1.5 py-0.5 rounded-full hover:bg-rose-500/20">
+                PDF
+              </button>
+            </div>
+          @endif
 
           <div class="flex items-center gap-1 text-[11px] text-slate-500">
             <span class="group-open:hidden">Show table</span>
@@ -209,6 +221,31 @@
       </summary>
 
       <div class="border-t border-gray-200">
+        {{-- Summary strip above the grid (filter-aware totals) --}}
+        <div id="offloadSummaryBar"
+             class="px-4 py-2 border-b border-gray-200 text-[11px] text-slate-600 flex flex-wrap gap-3 items-center justify-between">
+          <div class="flex flex-wrap gap-3">
+            <span>
+              <span class="font-semibold" id="sumLitres">0.0</span> L
+            </span>
+            <span>
+              Value:
+              <span class="font-semibold" id="sumLineTotal">USD 0.00</span>
+            </span>
+            <span>
+              Paid (pro-rata):
+              <span class="font-semibold" id="sumPaid">USD 0.00</span>
+            </span>
+            <span>
+              Balance:
+              <span class="font-semibold" id="sumBalance">USD 0.00</span>
+            </span>
+          </div>
+          <span class="text-[10px] text-slate-400">
+            Totals reflect current filters
+          </span>
+        </div>
+
         <div id="offloadGrid" class="tabulator-wrapper"></div>
       </div>
     </details>
@@ -264,11 +301,16 @@
 @if(!$isSettled)
 <div id="recordPaymentModal" class="fixed inset-0 z-[120] hidden">
   <button type="button" class="absolute inset-0 bg-black/40 backdrop-blur-sm" data-rp-close></button>
-  <div class="absolute inset-0 flex items-start justify中心 p-4 md:p-8 overflow-y-auto">
-    <div class="w-full max-w-md bg白 rounded-2xl shadow-2xl border border-gray-100">
-      <div class="flex items-center justify-between border-b px-5 py-3 bg-gray-50 rounded-t-2xl">
-        <h3 class="font-semibold text-gray-900">Record Payment</h3>
-        <button type="button" class="text-gray-500 hover:text-gray-800" data-rp-close>✕</button>
+  <div class="absolute inset-0 flex items-start justify-center p-4 md:p-8 overflow-y-auto">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-emerald-100/80">
+      <div class="flex items-center justify-between border-b px-5 py-3 bg-emerald-50/70 rounded-t-2xl">
+        <div>
+          <h3 class="font-semibold text-gray-900 text-sm">Record Payment</h3>
+          <p class="text-[11px] text-emerald-800/80 mt-0.5">
+            Log a payment for this invoice. Any amount above the balance will be stored as client credit.
+          </p>
+        </div>
+        <button type="button" class="text-gray-400 hover:text-gray-700" data-rp-close>✕</button>
       </div>
 
       <form id="recordPaymentForm" class="p-5 space-y-4" action="{{ route('depot.payments.store') }}" method="POST">
@@ -282,48 +324,50 @@
           </span>
           <button type="button"
                   id="btnPayFull"
-                  class="text-[11px] inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-0.5 border border-emerald-100 hover:bg-emerald-100">
+                  class="text-[11px] inline-flex items-center gap-1 rounded-full bg-emerald-600/10 text-emerald-700 px-2.5 py-0.5 border border-emerald-200 hover:bg-emerald-600/15">
             <span>Pay full invoice</span>
           </button>
         </div>
 
-        <div>
-          <label class="text-xs text-gray-500">Date</label>
-          <input type="date" name="date" value="{{ now()->toDateString() }}"
-                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-gray-500">Date</label>
+            <input type="date" name="date" value="{{ now()->toDateString() }}"
+                   class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Method</label>
+            <select name="mode"
+                    class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="Cash">Cash</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Mobile Money">Mobile Money</option>
+            </select>
+          </div>
         </div>
 
         <div>
           <label class="text-xs text-gray-500">Amount (USD)</label>
           <input id="rpAmount" type="number" step="0.01" name="amount"
-                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-emerald-500"
+                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                  placeholder="0.00">
           <div id="rpHint" class="hidden mt-1 rounded-md border border-amber-200 bg-amber-50 text-amber-800 px-2 py-1 text-[12px]"></div>
         </div>
 
         <div>
-          <label class="text-xs text-gray-500">Method</label>
-          <select name="mode"
-                  class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-emerald-500">
-            <option value="Cash">Cash</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-            <option value="Cheque">Cheque</option>
-            <option value="Mobile Money">Mobile Money</option>
-          </select>
-        </div>
-
-        <div>
           <label class="text-xs text-gray-500">Reference / Notes</label>
           <input type="text" name="reference"
-                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                 placeholder="Optional reference">
         </div>
 
-        <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
-          <button type="button" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700" data-rp-close>
+        <div class="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
+          <button type="button" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm" data-rp-close>
             Cancel
           </button>
           <button id="rpSubmit" type="submit"
-                  class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow">
+                  class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow text-sm">
             Save Payment
           </button>
         </div>
@@ -340,8 +384,13 @@
   <div class="absolute inset-0 flex items-start justify-center p-4 md:p-8 overflow-y-auto">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100">
       <div class="flex items-center justify-between border-b px-5 py-3 bg-gray-50 rounded-t-2xl">
-        <h3 class="font-semibold text-gray-900">Apply Credit</h3>
-        <button type="button" class="text-gray-500 hover:text-gray-800" data-ac-close>✕</button>
+        <div>
+          <h3 class="font-semibold text-gray-900 text-sm">Apply Credit</h3>
+          <p class="text-[11px] text-gray-500 mt-0.5">
+            Use available client credit to reduce this invoice balance.
+          </p>
+        </div>
+        <button type="button" class="text-gray-400 hover:text-gray-700" data-ac-close>✕</button>
       </div>
 
       <form id="applyCreditForm" class="p-5 space-y-4"
@@ -354,7 +403,7 @@
           </span>
           <button type="button"
                   id="btnCreditFull"
-                  class="text-[11px] inline-flex items-center gap-1 rounded-full bg-sky-50 text-sky-700 px-2.5 py-0.5 border border-sky-100 hover:bg-sky-100">
+                  class="text-[11px] inline-flex items-center gap-1 rounded-full bg-sky-600/10 text-sky-700 px-2.5 py-0.5 border border-sky-200 hover:bg-sky-600/15">
             Max for this invoice
           </button>
         </div>
@@ -362,7 +411,7 @@
         <div>
           <label class="text-xs text-gray-500">Credit</label>
           <select id="creditSelect" name="credit_id"
-                  class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-sky-500">
+                  class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
             @foreach($credits as $c)
               <option value="{{ $c->id }}"
                       data-remaining="{{ number_format($c->remaining, 2, '.', '') }}"
@@ -377,7 +426,7 @@
         <div>
           <label class="text-xs text-gray-500">Amount</label>
           <input id="creditAmount" type="number" step="0.01" name="amount"
-                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-sky-500"
+                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
                  placeholder="0.00">
           <div id="creditHint" class="hidden mt-1 rounded-md border border-amber-200 bg-amber-50 text-amber-800 px-2 py-1 text-[12px]"></div>
         </div>
@@ -385,15 +434,16 @@
         <div>
           <label class="text-xs text-gray-500">Notes</label>
           <input type="text" name="notes"
-                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-sky-500">
+                 class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                 placeholder="Optional internal note">
         </div>
 
-        <div class="flex justify-end gap-2 pt-2 border-t border-gray-100">
-          <button type="button" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700" data-ac-close>
+        <div class="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
+          <button type="button" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm" data-ac-close>
             Cancel
           </button>
           <button id="acSubmit" type="submit"
-                  class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 shadow">
+                  class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 shadow text-sm">
             Apply Credit
           </button>
         </div>
@@ -487,13 +537,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2200);
   }
 
+  // Formatting helpers
+  function formatMoney(v, ccy) {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: ccy
+      }).format(v);
+    } catch {
+      const num = Number(v) || 0;
+      return `${ccy} ${num.toFixed(2)}`;
+    }
+  }
+
+  function formatNumber(v, decimals) {
+    const num = Number(v) || 0;
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+  }
+
   // --- Tabulator for linked offloads (auto-height, Excel-ish, fit to content) ---
+  let offloadGridInstance = null;
   if (window.Tabulator && document.getElementById('offloadGrid')) {
-    const grid = new Tabulator("#offloadGrid", {
+    offloadGridInstance = new Tabulator("#offloadGrid", {
       data: offloadData,
       height: "fitData",       // hug content vertically
       maxHeight: "360px",      // scroll if tall
-      layout: "fitData",       // << columns sized to fit header/content
+      layout: "fitData",       // columns sized to fit header/content
       columnHeaderVertAlign: "middle",
       placeholder: "No offloads linked to this invoice yet.",
       columns: [
@@ -510,7 +582,10 @@ document.addEventListener('DOMContentLoaded', () => {
           hozAlign: "right",
           sorter: "number",
           formatter: "money",
-          formatterParams: {precision: 3, thousand:",", decimal:"."}
+          formatterParams: {precision: 1, thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 1, thousand:",", decimal:"."}
         },
         {
           title: "Rate",
@@ -526,7 +601,10 @@ document.addEventListener('DOMContentLoaded', () => {
           hozAlign: "right",
           sorter: "number",
           formatter: "money",
-          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
+          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
         },
         {
           title: "Paid (pro-rata)",
@@ -534,7 +612,10 @@ document.addEventListener('DOMContentLoaded', () => {
           hozAlign: "right",
           sorter: "number",
           formatter: "money",
-          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
+          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
         },
         {
           title: "Balance",
@@ -542,28 +623,122 @@ document.addEventListener('DOMContentLoaded', () => {
           hozAlign: "right",
           sorter: "number",
           formatter: "money",
-          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
+          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
         },
       ],
     });
 
-    document.getElementById('btnExportOffloads')?.addEventListener('click', () => {
-      const filename = `invoice_{{ $invoice->number }}_offloads.csv`;
-      grid.download("csv", filename);
+    // --- Summary strip above grid (filter-aware totals) ---
+    const sumLitresEl    = document.getElementById('sumLitres');
+    const sumLineTotalEl = document.getElementById('sumLineTotal');
+    const sumPaidEl      = document.getElementById('sumPaid');
+    const sumBalanceEl   = document.getElementById('sumBalance');
+
+    function refreshOffloadSummary() {
+      if (!offloadGridInstance) return;
+      // "active" = filtered + sorted + visible data
+      const rows = offloadGridInstance.getData("active") || [];
+
+      let totalLitres = 0;
+      let totalLine   = 0;
+      let totalPaid   = 0;
+      let totalBal    = 0;
+
+      rows.forEach(r => {
+        totalLitres += Number(r.litres)     || 0;
+        totalLine   += Number(r.line_total) || 0;
+        totalPaid   += Number(r.paid)       || 0;
+        totalBal    += Number(r.balance)    || 0;
+      });
+
+      if (sumLitresEl)    sumLitresEl.textContent    = formatNumber(totalLitres, 1);
+      if (sumLineTotalEl) sumLineTotalEl.textContent = formatMoney(totalLine, "USD");
+      if (sumPaidEl)      sumPaidEl.textContent      = formatMoney(totalPaid, "USD");
+      if (sumBalanceEl)   sumBalanceEl.textContent   = formatMoney(totalBal, "USD");
+    }
+
+    offloadGridInstance.on("dataLoaded",   refreshOffloadSummary);
+    offloadGridInstance.on("dataFiltered", refreshOffloadSummary);
+    offloadGridInstance.on("dataChanged",  refreshOffloadSummary);
+    refreshOffloadSummary();
+
+    // --- Exports (CSV / XLSX / PDF) ---
+    const baseFilename = `invoice_{{ $invoice->number }}_offloads.csv`;
+
+    function bindOffloadExport(buttonId, type) {
+      const btn = document.getElementById(buttonId);
+      if (!btn || !offloadGridInstance) return;
+
+      btn.addEventListener('click', () => {
+        if (!offloadGridInstance) return;
+        if (type === 'csv') {
+          offloadGridInstance.download("csv", baseFilename);
+        } else if (type === 'xlsx') {
+          offloadGridInstance.download("xlsx", baseFilename.replace(/\.csv$/i, '.xlsx'), {
+            sheetName: "Offloads"
+          });
+        } else if (type === 'pdf') {
+          offloadGridInstance.download("pdf", baseFilename.replace(/\.csv$/i, '.pdf'), {
+            orientation: "landscape",
+            title: "Offloads for invoice {{ $invoice->number }}"
+          });
+        }
+      });
+    }
+
+    bindOffloadExport('btnOffloadsCsv',  'csv');
+    bindOffloadExport('btnOffloadsXlsx', 'xlsx');
+    bindOffloadExport('btnOffloadsPdf',  'pdf');
+  }
+
+  // --- Generic modal helpers (click-outside & ESC) ---
+  function setupModalRoot(rootId, overlaySelector, closeAttrPrefix) {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+
+    const overlay      = root.querySelector(overlaySelector);
+    const closeButtons = root.querySelectorAll(`[data-${closeAttrPrefix}-close]`);
+
+    function close() {
+      root.classList.add('hidden');
+    }
+
+    function open() {
+      root.classList.remove('hidden');
+    }
+
+    if (overlay) {
+      overlay.addEventListener('click', close);
+    }
+    closeButtons.forEach(btn => btn.addEventListener('click', close));
+
+    // ESC closes if open
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !root.classList.contains('hidden')) {
+        close();
+      }
     });
+
+    return { open, close };
   }
 
   // --- RECORD PAYMENT MODAL + full-pay helper ---
-  const rpm = document.getElementById('recordPaymentModal');
-  const rpAmount = document.getElementById('rpAmount');
-  const rpHint = document.getElementById('rpHint');
+  const rpmRoot    = document.getElementById('recordPaymentModal');
+  const rpAmount   = document.getElementById('rpAmount');
+  const rpHint     = document.getElementById('rpHint');
+  const rpControls = rpmRoot ? setupModalRoot('recordPaymentModal', '[data-rp-close]', 'rp') : null;
 
-  function openRpm() { rpm?.classList.remove('hidden'); setTimeout(()=>rpAmount?.focus(), 40); }
-  function closeRpm() { rpm?.classList.add('hidden'); }
+  function openRpm() {
+    if (!rpControls) return;
+    rpControls.open();
+    setTimeout(() => rpAmount?.focus(), 40);
+  }
 
   document.getElementById('btnRecordPayment')?.addEventListener('click', openRpm);
   document.getElementById('btnRecordPayment2')?.addEventListener('click', openRpm);
-  rpm?.querySelectorAll('[data-rp-close]')?.forEach(b => b.addEventListener('click', closeRpm));
 
   document.getElementById('btnPayFull')?.addEventListener('click', () => {
     if (!rpAmount) return;
@@ -573,10 +748,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function reflectRpExceed() {
-    if (!rpAmount) return;
+    if (!rpAmount || !rpHint) return;
     const raw = parseFloat(rpAmount.value || '0') || 0;
-    if (raw > invoiceBalance) {
-      rpHint.textContent = `Entered amount is above outstanding balance. It will be capped to ${invoiceBalance.toFixed(2)}.`;
+    if (raw > invoiceBalance && invoiceBalance > 0) {
+      const extra = (raw - invoiceBalance).toFixed(2);
+      rpHint.textContent =
+        `Entered amount exceeds outstanding balance. Extra USD ${extra} will be added as client credit.`;
       rpHint.classList.remove('hidden');
     } else {
       rpHint.classList.add('hidden');
@@ -590,9 +767,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const form = e.target;
     const fd   = new FormData(form);
 
+    // No capping anymore – allow overpayment so extra becomes credit
     const raw = parseFloat(fd.get('amount') || '0') || 0;
-    const clamped = Math.max(0, Math.min(raw, invoiceBalance));
-    fd.set('amount', clamped.toFixed(2));
+    const cleaned = Math.max(0, raw);
+    fd.set('amount', cleaned.toFixed(2));
 
     const btn  = form.querySelector('button[type="submit"]');
     const prev = btn?.textContent;
@@ -611,18 +789,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- APPLY CREDIT MODAL + full-credit helpers ---
-  const acm = document.getElementById('applyCreditModal');
-  const cs  = document.getElementById('creditSelect');
-  const ca  = document.getElementById('creditAmount');
-  const ch  = document.getElementById('creditHint');
-  const cav = document.getElementById('creditAvailNote');
+  const acRoot     = document.getElementById('applyCreditModal');
+  const cs         = document.getElementById('creditSelect');
+  const ca         = document.getElementById('creditAmount');
+  const ch         = document.getElementById('creditHint');
+  const cav        = document.getElementById('creditAvailNote');
+  const acControls = acRoot ? setupModalRoot('applyCreditModal', '[data-ac-close]', 'ac') : null;
 
-  function openAcm() { acm?.classList.remove('hidden'); refreshAvailNote(); setTimeout(()=>ca?.focus(), 40); }
-  function closeAcm() { acm?.classList.add('hidden'); }
+  function openAcm() {
+    if (!acControls) return;
+    acControls.open();
+    refreshAvailNote();
+    setTimeout(() => ca?.focus(), 40);
+  }
 
   document.getElementById('btnApplyCredit')?.addEventListener('click', openAcm);
   document.getElementById('btnApplyCredit2')?.addEventListener('click', openAcm);
-  acm?.querySelectorAll('[data-ac-close]')?.forEach(b => b.addEventListener('click', closeAcm));
 
   function currentRemaining() {
     if (!cs) return 0;
@@ -637,19 +819,17 @@ document.addEventListener('DOMContentLoaded', () => {
   function maxForCurrentCredit() {
     return Math.min(currentRemaining(), invoiceBalance);
   }
-  function formatMoney(v, ccy) {
-    try { return new Intl.NumberFormat(undefined, { style:'currency', currency: ccy }).format(v); }
-    catch { return `${ccy} ${Number(v).toFixed(2)}`; }
-  }
+
   function refreshAvailNote() {
     if (!cav) return;
     const rem = currentRemaining();
     const ccy = currentCurrency();
     const max = maxForCurrentCredit();
-    cav.textContent = `Available on this credit: ${formatMoney(rem, ccy)} • Max usable on this invoice: ${formatMoney(max, ccy)}`;
+    cav.textContent =
+      `Available on this credit: ${formatMoney(rem, ccy)} • Max usable on this invoice: ${formatMoney(max, ccy)}`;
   }
   function reflectCreditExceed() {
-    if (!ca) return;
+    if (!ca || !ch) return;
     const amt = parseFloat(ca.value || '0') || 0;
     const max = maxForCurrentCredit();
     const ccy = currentCurrency();
@@ -692,7 +872,6 @@ document.addEventListener('DOMContentLoaded', () => {
       let data = null;
       try { data = await res.json(); } catch {}
       if (res.ok && (data?.ok ?? true)) {
-        closeAcm();
         toast(`Credit applied: ${clamped.toFixed(2)}`);
         location.reload();
         return;
