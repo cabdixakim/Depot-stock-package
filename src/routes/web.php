@@ -78,7 +78,7 @@ Route::middleware(['web', 'auth'])
 
             // 🧮 Storage fee preview & charge (idle stock)
            // Storage charges for idle stock
-            Route::post('/clients/{client}/storage/charge', [ClientController::class, 'storeStorageCharge'])->name('clients.storage.charge');
+            // Route::post('/clients/{client}/storage/charge', [ClientController::class, 'storeStorageCharge'])->name('clients.storage.charge');
             Route::post('/clients/{client}/storage/extend', [ClientController::class, 'extendStorageGrace'])->name('clients.storage.extend');
 
             // ---------------- Invoices ----------------
