@@ -9,7 +9,11 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
 
   {{-- CSS --}}
-  @vite(['resources/css/app.css'])
+  <!-- Tailwind CDN – bypass Vite completely -->
+<script src="https://cdn.tailwindcss.com"></script>
+  
+
+<!-- @vite(['resources/css/app.css']) -->
 
   {{-- Livewire styles (if you use them) --}}
   @livewireStyles
