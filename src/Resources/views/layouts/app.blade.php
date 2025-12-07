@@ -12,7 +12,7 @@
   <!-- Tailwind CDN – bypass Vite completely -->
 <script src="https://cdn.tailwindcss.com"></script>
   
-
+<!-- remember to uncomment this during production -->
 <!-- @vite(['resources/css/app.css']) -->
 
   {{-- Livewire styles (if you use them) --}}
