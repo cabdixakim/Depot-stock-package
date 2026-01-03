@@ -36,46 +36,11 @@ class DepotController extends Controller
     public function store(Request $r)
     {
         $data = $r->validate([
-            'name'        => ['required','string','max:255'],
-            'location'    => ['nullable','string','max:255'],
-
-            // ✅ new
-            'product_ids'   => ['nullable','array'],
-            'product_ids.*' => ['integer', Rule::exists('products', 'id')],
-
-            'new_products'   => ['nullable','array'],
-            'new_products.*' => ['string','max:80'],
+            'name'     => ['required','string','max:255'],
+            'location' => ['nullable','string','max:255'],
         ]);
 
-        $depot = Depot::create([
-            'name'     => $data['name'],
-            'location' => $data['location'] ?? null,
-        ]);
-
-        // Build final product ids (existing + created)
-        $finalProductIds = collect($data['product_ids'] ?? [])->map(fn($v) => (int)$v);
-
-        $newNames = collect($data['new_products'] ?? [])
-            ->map(fn($s) => trim(preg_replace('/\s+/', ' ', (string)$s)))
-            ->filter()
-            ->unique(fn($s) => mb_strtolower($s));
-
-        foreach ($newNames as $name) {
-            // Use firstOrCreate to avoid duplicates
-            $p = Product::firstOrCreate(
-                ['name' => $name],
-                ['default_density' => 0.82] // safe default if you have status column; remove if not
-            );
-            $finalProductIds->push((int)$p->id);
-        }
-
-        $finalProductIds = $finalProductIds->filter()->unique()->values();
-
-        // Attach to depot ONLY if the relationship exists on your Depot model.
-        if ($finalProductIds->isNotEmpty() && method_exists($depot, 'products')) {
-            // Many-to-many expected
-            $depot->products()->syncWithoutDetaching($finalProductIds->all());
-        }
+        Depot::create($data);
 
         return redirect()
             ->route('depot.depots.index')
@@ -143,6 +108,49 @@ class DepotController extends Controller
         ]);
     }
 
+    /**
+     * Create a product quickly (name only).
+     * Default density is assigned in backend (no UI field).
+     *
+     * NOTE: register route name `depot.products.store` pointing here.
+     */
+    public function storeProduct(Request $r)
+    {
+        $data = $r->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('products', 'name')],
+        ]);
+
+        $name = trim($data['name']);
+
+        // Backend default density (safe fallback)
+        // If you later want this configurable, you can move it to DepotPolicy or config.
+        $defaultDensity = 0.820;
+
+        $product = Product::create([
+            'name'            => $name,
+            'default_density' => $defaultDensity,
+        ]);
+
+        // JSON for fetch() calls
+        if ($r->expectsJson()) {
+            return response()->json([
+                'ok'      => true,
+                'product' => [
+                    'id'   => $product->id,
+                    'name' => $product->name,
+                ],
+            ]);
+        }
+
+        return redirect()
+            ->back()
+            ->with('status', 'Product created.');
+    }
+
+    /**
+     * Save global depot policies (allowance rate, idle days, risk thresholds, dip L/cm).
+     * Uses depot_policies table with `code`, `name`, `value_numeric`.
+     */
     public function savePolicies(Request $r)
     {
         $data = $r->validate([
@@ -153,6 +161,7 @@ class DepotController extends Controller
             'default_dip_litres_per_cm'     => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        // Human-readable names for the policies
         $labels = [
             'allowance_rate'                => 'Offload allowance rate',
             'max_storage_days'              => 'Max storage days',
@@ -170,7 +179,10 @@ class DepotController extends Controller
         ];
 
         foreach ($map as $code => $value) {
-            if ($value === null) continue;
+            if ($value === null) {
+                // leave existing row untouched if the field was left empty
+                continue;
+            }
 
             DepotPolicy::updateOrCreate(
                 ['code' => $code],
