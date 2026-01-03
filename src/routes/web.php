@@ -180,7 +180,10 @@ Route::middleware(['web', 'auth'])
             Route::post('/settings/users/{user}/roles', [UserController::class, 'updateRoles'])->name('settings.users.roles');
             Route::post('/settings/users/{user}/reset', [UserController::class, 'resetPassword'])->name('settings.users.reset');
             Route::post('/settings/users/{user}/basic', [UserController::class, 'updateBasic'])->name('settings.users.basic');
-
+           
+            // ---------------- Products ----------------
+            Route::post('/products', [DepotController::class, 'storeProduct'])
+                ->name('depot.products.store');
             // ---------------- Depot policies (global settings) ----------------
             Route::post('/settings/depot-policies', [DepotController::class, 'savePolicies'])
                 ->name('policies.save');
