@@ -216,7 +216,7 @@
           </div>
 
           <p class="text-[11px] text-gray-400">
-            Density is assigned automatically by backend (default).
+            Density is defaulted at 0.82  
           </p>
 
           <div id="productError" class="hidden text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2"></div>
