@@ -183,7 +183,7 @@ Route::middleware(['web', 'auth'])
            
             // ---------------- Products ----------------
             Route::post('/products', [DepotController::class, 'storeProduct'])
-                ->name('depot.products.store');
+                ->name('products.store');
             // ---------------- Depot policies (global settings) ----------------
             Route::post('/settings/depot-policies', [DepotController::class, 'savePolicies'])
                 ->name('policies.save');
