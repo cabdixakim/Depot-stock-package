@@ -560,6 +560,28 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+
+  // --- CREDIT NOTE BUTTON (bind early; survive other JS errors) ---
+  try {
+    const btn = document.getElementById('btnCreditNote');
+    const modal = document.getElementById('creditNoteModal');
+
+    if (btn && modal) {
+      const closeEls = modal.querySelectorAll('[data-cn-close]');
+      const open = () => modal.classList.remove('hidden');
+      const close = () => modal.classList.add('hidden');
+
+      btn.addEventListener('click', open);
+      closeEls.forEach(el => el.addEventListener('click', close));
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) close();
+      });
+    }
+  } catch (e) {
+    console.error('Credit note bind failed', e);
+  }
+  // --- DATA FROM BACKEND ---
   const invoiceBalance = {{ json_encode(max(0, $balance)) }};
   const offloadData    = @json($offloadRows);
 
@@ -782,44 +804,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return { open, close };
   }
 
-  // --- CREDIT NOTE MODAL (only exists when invoice is settled) ---
-  const cnRoot     = document.getElementById('creditNoteModal');
-  const cnAmount   = document.getElementById('cnAmount');
-  const cnControls = cnRoot ? setupModalRoot('creditNoteModal', '[data-cn-close]', 'cn') : null;
-
-  function openCnm() {
-    if (!cnControls) return;
-    cnControls.open();
-    setTimeout(() => cnAmount?.focus(), 40);
-  }
-
-  document.getElementById('btnCreditNote')?.addEventListener('click', openCnm);
-
-  document.getElementById('creditNoteForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const fd   = new FormData(form);
-
-    const raw = parseFloat(fd.get('amount') || '0') || 0;
-    const cleaned = Math.max(0, raw);
-    fd.set('amount', cleaned.toFixed(2));
-
-    const btn  = document.getElementById('cnSubmit');
-    const prev = btn?.textContent;
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-
-    try {
-      const res  = await fetch(form.action, { method:'POST', headers:{'Accept':'application/json'}, body:fd });
-      if (res.ok) { location.reload(); return; }
-      const t = await res.text();
-      toast('Failed to save credit note', 'err');
-      console.error(t);
-    } catch (err) {
-      toast('Network error', 'err');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = prev; }
-    }
-  });
 
   // --- RECORD PAYMENT MODAL + full-pay helper ---
   const rpmRoot    = document.getElementById('recordPaymentModal');
