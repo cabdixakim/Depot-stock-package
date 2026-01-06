@@ -1,6 +1,6 @@
 <?php
 
-namespace Cabdixakim\DepotStock\Models;
+namespace Optima\DepotStock\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
