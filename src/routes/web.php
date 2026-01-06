@@ -91,7 +91,12 @@ Route::middleware(['web', 'auth'])
                 '/invoices/{invoice}/apply-credit',
                 [InvoiceController::class, 'applyCredit']
             )->name('invoices.apply_credit');
-
+            // Store credit note
+                Route::post(
+                '/invoices/{invoice}/credit-notes',
+                [ClientCreditController::class, 'storeCreditNote']
+            )->name('invoices.credit-notes.store');
+            
             // ---------------- Payments (global) ----------------
             Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
             Route::post('/payments',[PaymentController::class, 'store'])->name('payments.store');

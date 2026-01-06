@@ -9,6 +9,35 @@ use Optima\DepotStock\Models\{ClientCredit, Invoice, Payment};
 
 class ClientCreditController extends Controller
 {
+
+     public function storeCreditNote(Request $request, Invoice $invoice)
+    {
+        $request->validate([
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        DB::transaction(function () use ($request, $invoice) {
+            ClientCredit::create([
+                'client_id'  => $invoice->client_id,
+                'invoice_id' => $invoice->id,
+                'amount'     => $request->amount,
+                'remaining'  => $request->amount,
+                'currency'   => $invoice->currency,
+                'reason'     => $request->reason,
+                'source'     => 'credit_note',
+                'created_by'=> auth()->id(),
+                'meta'       => [
+                    'invoice_no' => $invoice->invoice_no ?? null,
+                ],
+            ]);
+        });
+
+        return redirect()
+            ->back()
+            ->with('success', 'Credit note added successfully.');
+    }
+
     /**
      * Apply an existing client credit to a specific invoice.
      */
