@@ -116,14 +116,13 @@
         </button>
       @endif
 
-      {{-- ✅ PATCH: Credit Note (allowed even when settled) --}}
+      {{-- CREDIT NOTE (allowed even when settled/paid) --}}
       @if($isSettled)
         <button id="btnCreditNote"
                 class="px-3 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 text-sm shadow-sm">
           Add Credit Note
         </button>
       @endif
-      {{-- ✅ END PATCH --}}
     </div>
   </div>
 
@@ -462,7 +461,7 @@
 </div>
 @endif
 
-{{-- ✅ PATCH: CREDIT NOTE MODAL (allowed even when settled) --}}
+{{-- CREDIT NOTE MODAL --}}
 @if($isSettled)
 <div id="creditNoteModal" class="fixed inset-0 z-[120] hidden">
   <button type="button" class="absolute inset-0 bg-black/40 backdrop-blur-sm" data-cn-close></button>
@@ -472,7 +471,7 @@
         <div>
           <h3 class="font-semibold text-gray-900 text-sm">Add Credit Note</h3>
           <p class="text-[11px] text-rose-800/80 mt-0.5">
-            Create a credit note for this invoice. This adds client wallet credit and does not edit the invoice.
+            This creates client wallet credit without editing the invoice.
           </p>
         </div>
         <button type="button" class="text-gray-400 hover:text-gray-700" data-cn-close>✕</button>
@@ -510,21 +509,48 @@
   </div>
 </div>
 @endif
-{{-- ✅ END PATCH --}}
-
 @endsection
 
 @push('styles')
 <link rel="stylesheet"
       href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css">
+
 <style>
-  /* Keep Tabulator minimal + clean inside cards */
+  /* Excel-y Tabulator look with full grid borders */
   .tabulator-wrapper .tabulator {
-    border: none;
+    border-radius: 0;
+    border: 1px solid #e5e7eb; /* outer border */
     font-size: 12px;
   }
-  .tabulator-wrapper .tabulator .tabulator-header {
+
+  .tabulator-wrapper .tabulator-header {
+    background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
     border-bottom: 1px solid #e5e7eb;
+  }
+
+  .tabulator-wrapper .tabulator-header .tabulator-col {
+    border-right: 1px solid #e5e7eb;
+  }
+  .tabulator-wrapper .tabulator-header .tabulator-col:first-child {
+    border-left: 1px solid #e5e7eb;
+  }
+
+  .tabulator-wrapper .tabulator-row {
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .tabulator-wrapper .tabulator-row .tabulator-cell {
+    border-right: 1px solid #e5e7eb;
+  }
+  .tabulator-wrapper .tabulator-row .tabulator-cell:first-child {
+    border-left: 1px solid #e5e7eb;
+  }
+
+  .tabulator-wrapper .tabulator-row:nth-child(even) {
+    background-color: #fcfcfc;
+  }
+  .tabulator-wrapper .tabulator-row.tabulator-row-hover {
+    background-color: #eef2ff;
   }
 </style>
 @endpush
@@ -534,99 +560,272 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // ---- Simple toast ----
-  function toast(msg, type='ok') {
+  const invoiceBalance = {{ json_encode(max(0, $balance)) }};
+  const offloadData    = @json($offloadRows);
+
+  // --- tiny toast ---
+  function toast(msg, tone = 'ok') {
+    let wrap = document.getElementById('toastWrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'toastWrap';
+      Object.assign(wrap.style, {
+        position:'fixed', top:'16px', right:'16px', zIndex:'9999',
+        display:'flex', flexDirection:'column', gap:'8px'
+      });
+      document.body.appendChild(wrap);
+    }
     const el = document.createElement('div');
-    el.className = `fixed bottom-4 right-4 z-[200] px-4 py-2 rounded-xl shadow text-sm ${
-      type === 'err' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'
-    }`;
+    const palette = tone === 'err'
+      ? {bg:'linear-gradient(135deg,#ef4444,#dc2626)', shadow:'rgba(239,68,68,0.25)'}
+      : {bg:'linear-gradient(135deg,#10b981,#059669)', shadow:'rgba(16,185,129,0.25)'};
+    Object.assign(el.style, {
+      background: palette.bg, color:'#fff', padding:'10px 14px',
+      borderRadius:'10px', boxShadow:`0 8px 20px ${palette.shadow}`,
+      fontSize:'13px', fontWeight:'600'
+    });
     el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
+    wrap.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = 'opacity .25s ease, transform .25s ease';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(-6px)';
+      setTimeout(() => el.remove(), 260);
+    }, 2200);
   }
 
-  // ---- Helpers ----
-  function formatMoney(n, ccy='USD') {
-    const v = (parseFloat(n||0) || 0).toFixed(2);
-    return `${ccy} ${v}`;
+  // Formatting helpers
+  function formatMoney(v, ccy) {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: ccy
+      }).format(v);
+    } catch {
+      const num = Number(v) || 0;
+      return `${ccy} ${num.toFixed(2)}`;
+    }
   }
 
-  // ---- Modal helper ----
-  function setupModalRoot(rootId, closeSelector, focusTrapPrefix) {
+  function formatNumber(v, decimals) {
+    const num = Number(v) || 0;
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+  }
+
+  // --- Tabulator for linked offloads (auto-height, Excel-ish, fit to content) ---
+  let offloadGridInstance = null;
+  if (window.Tabulator && document.getElementById('offloadGrid')) {
+    offloadGridInstance = new Tabulator("#offloadGrid", {
+      data: offloadData,
+      height: "fitData",       // hug content vertically
+      maxHeight: "360px",      // scroll if tall
+      layout: "fitData",       // columns sized to fit header/content
+      columnHeaderVertAlign: "middle",
+      placeholder: "No offloads linked to this invoice yet.",
+      columns: [
+        {title: "Date", field: "date", sorter: "date"},
+        {title: "Depot", field: "depot"},
+        {title: "Product", field: "product"},
+        {title: "Truck", field: "truck", headerHozAlign:"center"},
+        {title: "Trailer", field: "trailer", headerHozAlign:"center"},
+        {title: "Ref", field: "ref"},
+        {title: "Tank", field: "tank", hozAlign:"center"},
+        {
+          title: "Litres",
+          field: "litres",
+          hozAlign: "right",
+          sorter: "number",
+          formatter: "money",
+          formatterParams: {precision: 1, thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 1, thousand:",", decimal:"."}
+        },
+        {
+          title: "Rate",
+          field: "rate",
+          hozAlign: "right",
+          sorter: "number",
+          formatter: "money",
+          formatterParams: {precision: 3, symbol:"USD ", thousand:",", decimal:"."}
+        },
+        {
+          title: "Line total",
+          field: "line_total",
+          hozAlign: "right",
+          sorter: "number",
+          formatter: "money",
+          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
+        },
+        {
+          title: "Paid (pro-rata)",
+          field: "paid",
+          hozAlign: "right",
+          sorter: "number",
+          formatter: "money",
+          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
+        },
+        {
+          title: "Balance",
+          field: "balance",
+          hozAlign: "right",
+          sorter: "number",
+          formatter: "money",
+          formatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."},
+          bottomCalc: "sum",
+          bottomCalcFormatter: "money",
+          bottomCalcFormatterParams: {precision: 2, symbol:"USD ", thousand:",", decimal:"."}
+        },
+      ],
+    });
+
+    // --- Summary strip above grid (filter-aware totals) ---
+    const sumLitresEl    = document.getElementById('sumLitres');
+    const sumLineTotalEl = document.getElementById('sumLineTotal');
+    const sumPaidEl      = document.getElementById('sumPaid');
+    const sumBalanceEl   = document.getElementById('sumBalance');
+
+    function refreshOffloadSummary() {
+      if (!offloadGridInstance) return;
+      // "active" = filtered + sorted + visible data
+      const rows = offloadGridInstance.getData("active") || [];
+
+      let totalLitres = 0;
+      let totalLine   = 0;
+      let totalPaid   = 0;
+      let totalBal    = 0;
+
+      rows.forEach(r => {
+        totalLitres += Number(r.litres)     || 0;
+        totalLine   += Number(r.line_total) || 0;
+        totalPaid   += Number(r.paid)       || 0;
+        totalBal    += Number(r.balance)    || 0;
+      });
+
+      if (sumLitresEl)    sumLitresEl.textContent    = formatNumber(totalLitres, 1);
+      if (sumLineTotalEl) sumLineTotalEl.textContent = formatMoney(totalLine, "USD");
+      if (sumPaidEl)      sumPaidEl.textContent      = formatMoney(totalPaid, "USD");
+      if (sumBalanceEl)   sumBalanceEl.textContent   = formatMoney(totalBal, "USD");
+    }
+
+    offloadGridInstance.on("dataLoaded",   refreshOffloadSummary);
+    offloadGridInstance.on("dataFiltered", refreshOffloadSummary);
+    offloadGridInstance.on("dataChanged",  refreshOffloadSummary);
+    refreshOffloadSummary();
+
+    // --- Exports (CSV / XLSX / PDF) ---
+    const baseFilename = `invoice_{{ $invoice->number }}_offloads.csv`;
+
+    function bindOffloadExport(buttonId, type) {
+      const btn = document.getElementById(buttonId);
+      if (!btn || !offloadGridInstance) return;
+
+      btn.addEventListener('click', () => {
+        if (!offloadGridInstance) return;
+        if (type === 'csv') {
+          offloadGridInstance.download("csv", baseFilename);
+        } else if (type === 'xlsx') {
+          offloadGridInstance.download("xlsx", baseFilename.replace(/\.csv$/i, '.xlsx'), {
+            sheetName: "Offloads"
+          });
+        } else if (type === 'pdf') {
+          offloadGridInstance.download("pdf", baseFilename.replace(/\.csv$/i, '.pdf'), {
+            orientation: "landscape",
+            title: "Offloads for invoice {{ $invoice->number }}"
+          });
+        }
+      });
+    }
+
+    bindOffloadExport('btnOffloadsCsv',  'csv');
+    bindOffloadExport('btnOffloadsXlsx', 'xlsx');
+    bindOffloadExport('btnOffloadsPdf',  'pdf');
+  }
+
+  // --- Generic modal helpers (click-outside & ESC) ---
+  function setupModalRoot(rootId, overlaySelector, closeAttrPrefix) {
     const root = document.getElementById(rootId);
-    if (!root) return null;
+    if (!root) return;
 
-    const closes = root.querySelectorAll(closeSelector);
+    const overlay      = root.querySelector(overlaySelector);
+    const closeButtons = root.querySelectorAll(`[data-${closeAttrPrefix}-close]`);
+
+    function close() {
+      root.classList.add('hidden');
+    }
 
     function open() {
       root.classList.remove('hidden');
-      document.body.classList.add('overflow-hidden');
-    }
-    function close() {
-      root.classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
     }
 
-    closes.forEach(btn => btn.addEventListener('click', close));
+    if (overlay) {
+      overlay.addEventListener('click', close);
+    }
+    closeButtons.forEach(btn => btn.addEventListener('click', close));
 
-    // ESC closes
-    root.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') close();
+    // ESC closes if open
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !root.classList.contains('hidden')) {
+        close();
+      }
     });
 
     return { open, close };
   }
 
-  // ---- Offloads grid (existing) ----
-  const offloadRows = @json($offloadRows);
-  const invoiceBalance = parseFloat(@json(max(0,$balance))) || 0;
+  // --- CREDIT NOTE MODAL (only exists when invoice is settled) ---
+  const cnRoot     = document.getElementById('creditNoteModal');
+  const cnAmount   = document.getElementById('cnAmount');
+  const cnControls = cnRoot ? setupModalRoot('creditNoteModal', '[data-cn-close]', 'cn') : null;
 
-  if (document.getElementById('offloadGrid')) {
-    const table = new Tabulator('#offloadGrid', {
-      data: offloadRows,
-      layout: "fitDataFill",
-      height: "auto",
-      responsiveLayout: true,
-      columns: [
-        {title:"Date", field:"date", width:110},
-        {title:"Depot", field:"depot", width:140},
-        {title:"Product", field:"product", width:120},
-        {title:"Tank", field:"tank", width:80},
-        {title:"Truck", field:"truck", width:130},
-        {title:"Trailer", field:"trailer", width:130},
-        {title:"Ref", field:"ref", width:140},
-        {title:"Litres", field:"litres", hozAlign:"right", formatter:"money", formatterParams:{precision:1}},
-        {title:"Rate", field:"rate", hozAlign:"right", formatter:"money", formatterParams:{precision:4}},
-        {title:"Line Total", field:"line_total", hozAlign:"right", formatter:"money", formatterParams:{precision:2}},
-        {title:"Paid", field:"paid", hozAlign:"right", formatter:"money", formatterParams:{precision:2}},
-        {title:"Balance", field:"balance", hozAlign:"right", formatter:"money", formatterParams:{precision:2}},
-      ],
-      dataFiltered: function(filters, rows){
-        const d = rows.map(r => r.getData());
-        const sumLitres = d.reduce((a,b)=>a+(parseFloat(b.litres)||0),0);
-        const sumLineTotal = d.reduce((a,b)=>a+(parseFloat(b.line_total)||0),0);
-        const sumPaid = d.reduce((a,b)=>a+(parseFloat(b.paid)||0),0);
-        const sumBalance = d.reduce((a,b)=>a+(parseFloat(b.balance)||0),0);
-        document.getElementById('sumLitres').textContent = sumLitres.toFixed(1);
-        document.getElementById('sumLineTotal').textContent = formatMoney(sumLineTotal,'USD');
-        document.getElementById('sumPaid').textContent = formatMoney(sumPaid,'USD');
-        document.getElementById('sumBalance').textContent = formatMoney(sumBalance,'USD');
-      },
-    });
-
-    document.getElementById('btnOffloadsCsv')?.addEventListener('click', () => table.download("csv", "invoice-offloads.csv"));
-    document.getElementById('btnOffloadsXlsx')?.addEventListener('click', () => table.download("xlsx", "invoice-offloads.xlsx", {sheetName:"Offloads"}));
-    document.getElementById('btnOffloadsPdf')?.addEventListener('click', () => table.download("pdf", "invoice-offloads.pdf", {orientation:"landscape", title:"Invoice Offloads"}));
-
-    // initial totals
-    table.redraw(true);
+  function openCnm() {
+    if (!cnControls) return;
+    cnControls.open();
+    setTimeout(() => cnAmount?.focus(), 40);
   }
 
-  // --- RECORD PAYMENT MODAL ---
-  const rpRoot     = document.getElementById('recordPaymentModal');
+  document.getElementById('btnCreditNote')?.addEventListener('click', openCnm);
+
+  document.getElementById('creditNoteForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const fd   = new FormData(form);
+
+    const raw = parseFloat(fd.get('amount') || '0') || 0;
+    const cleaned = Math.max(0, raw);
+    fd.set('amount', cleaned.toFixed(2));
+
+    const btn  = document.getElementById('cnSubmit');
+    const prev = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    try {
+      const res  = await fetch(form.action, { method:'POST', headers:{'Accept':'application/json'}, body:fd });
+      if (res.ok) { location.reload(); return; }
+      const t = await res.text();
+      toast('Failed to save credit note', 'err');
+      console.error(t);
+    } catch (err) {
+      toast('Network error', 'err');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = prev; }
+    }
+  });
+
+  // --- RECORD PAYMENT MODAL + full-pay helper ---
+  const rpmRoot    = document.getElementById('recordPaymentModal');
   const rpAmount   = document.getElementById('rpAmount');
   const rpHint     = document.getElementById('rpHint');
-  const rpControls = rpRoot ? setupModalRoot('recordPaymentModal', '[data-rp-close]', 'rp') : null;
+  const rpControls = rpmRoot ? setupModalRoot('recordPaymentModal', '[data-rp-close]', 'rp') : null;
 
   function openRpm() {
     if (!rpControls) return;
@@ -639,16 +838,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btnPayFull')?.addEventListener('click', () => {
     if (!rpAmount) return;
-    rpAmount.value = (invoiceBalance).toFixed(2);
-    rpAmount.dispatchEvent(new Event('input'));
+    rpAmount.value = invoiceBalance.toFixed(2);
+    rpHint.classList.add('hidden');
+    rpHint.textContent = '';
   });
 
   function reflectRpExceed() {
     if (!rpAmount || !rpHint) return;
-    const amt = parseFloat(rpAmount.value || '0') || 0;
-    if (amt > invoiceBalance) {
-      const extra = (amt - invoiceBalance).toFixed(2);
-      rpHint.textContent = `Overpayment detected: extra USD ${extra} will be stored as client credit.`;
+    const raw = parseFloat(rpAmount.value || '0') || 0;
+    if (raw > invoiceBalance && invoiceBalance > 0) {
+      const extra = (raw - invoiceBalance).toFixed(2);
+      rpHint.textContent =
+        `Entered amount exceeds outstanding balance. Extra USD ${extra} will be added as client credit.`;
       rpHint.classList.remove('hidden');
     } else {
       rpHint.classList.add('hidden');
@@ -682,46 +883,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btn) { btn.disabled = false; btn.textContent = prev; }
     }
   });
-
-  // ✅ PATCH: CREDIT NOTE MODAL (allowed even when settled)
-  const cnRoot     = document.getElementById('creditNoteModal');
-  const cnAmount   = document.getElementById('cnAmount');
-  const cnControls = cnRoot ? setupModalRoot('creditNoteModal', '[data-cn-close]', 'cn') : null;
-
-  function openCnm() {
-    if (!cnControls) return;
-    cnControls.open();
-    setTimeout(() => cnAmount?.focus(), 40);
-  }
-
-  document.getElementById('btnCreditNote')?.addEventListener('click', openCnm);
-
-  document.getElementById('creditNoteForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const fd   = new FormData(form);
-
-    const raw = parseFloat(fd.get('amount') || '0') || 0;
-    const cleaned = Math.max(0, raw);
-    fd.set('amount', cleaned.toFixed(2));
-
-    const btn  = document.getElementById('cnSubmit');
-    const prev = btn?.textContent;
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-
-    try {
-      const res = await fetch(form.action, { method:'POST', headers:{'Accept':'application/json'}, body:fd });
-      if (res.ok) { location.reload(); return; }
-      const t = await res.text();
-      toast('Failed to save credit note', 'err');
-      console.error(t);
-    } catch (err) {
-      toast('Network error', 'err');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = prev; }
-    }
-  });
-  // ✅ END PATCH
 
   // --- APPLY CREDIT MODAL + full-credit helpers ---
   const acRoot     = document.getElementById('applyCreditModal');
