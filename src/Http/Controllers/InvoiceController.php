@@ -81,10 +81,11 @@ class InvoiceController extends Controller
             $payload = DB::transaction(function () use ($data) {
 
                 $clientId = (int)$data['client_id'];
+                $clientCode = Client::find($clientId)->code ?? 'INV';
                 $rate     = (float)$data['rate_per_litre'];
 
                 // 🔢 Generate number INV-YYYYMM-####
-                $prefix = 'INV-'.now()->format('Ym').'-';
+                $prefix = $clientCode.'-'.now()->format('Ym').'-';
                 $seq = str_pad(
                     (string) DB::table('invoices')->where('number', 'like', "$prefix%")->count() + 1,
                     4, '0', STR_PAD_LEFT
