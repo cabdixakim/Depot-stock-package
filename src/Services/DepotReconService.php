@@ -3,8 +3,11 @@
 namespace Optima\DepotStock\Services;
 
 use Carbon\Carbon;
+use Optima\DepotStock\Models\Adjustment;
 use Optima\DepotStock\Models\DepotReconDay;
 use Optima\DepotStock\Models\DepotReconDip;
+use Optima\DepotStock\Models\Load;
+use Optima\DepotStock\Models\Offload;
 use Optima\DepotStock\Models\Tank;
 
 class DepotReconService
@@ -117,7 +120,6 @@ class DepotReconService
 
     /**
      * Recompute expected closing using movements for that tank+date.
-     * Currently stubbed; adjust date filters to your schema.
      */
     public function recomputeExpectedClosing(DepotReconDay $day, Carbon $date): void
     {
@@ -161,51 +163,40 @@ class DepotReconService
      *
      * Returns:
      * [
-     *   'in_l_20'  => float,
-     *   'out_l_20' => float,
+     *   'in_l_20'  => float,  // loads in + positive adjustments
+     *   'out_l_20' => float,  // offloads out + negative adjustments (absolute)
      * ]
-     *
-     * TODO: wire this to offloads / loads / adjustments / pool using your actual date columns.
      */
     public function movementTotalsForDay(int $tankId, Carbon $date): array
     {
-        // --- TEMPLATE ONLY: adjust column names + date fields to your schema ---
-        //
-        // Example idea (commented out so it doesn't break now):
-        //
-        // $start = $date->copy()->startOfDay();
-        // $end   = $date->copy()->endOfDay();
-        //
-        // $offIn = \Optima\DepotStock\Models\Offload::where('tank_id', $tankId)
-        //     ->whereBetween('date', [$start, $end]) // change 'date' to your actual column
-        //     ->sum('delivered_20_l');
-        //
-        // $loadsOut = \Optima\DepotStock\Models\Load::where('tank_id', $tankId)
-        //     ->whereBetween('date', [$start, $end])
-        //     ->sum('loaded_20_l');
-        //
-        // $adjPos = \Optima\DepotStock\Models\Adjustment::where('tank_id', $tankId)
-        //     ->where('type', 'positive')
-        //     ->whereBetween('date', [$start, $end])
-        //     ->sum('amount_20_l');
-        //
-        // $adjNeg = \Optima\DepotStock\Models\Adjustment::where('tank_id', $tankId)
-        //     ->where('type', 'negative')
-        //     ->whereBetween('date', [$start, $end])
-        //     ->sum('amount_20_l');
-        //
-        // $in  = $offIn + $adjPos;   // plus pool_in etc
-        // $out = $loadsOut + $adjNeg; // plus pool_out etc
-        //
-        // return [
-        //     'in_l_20'  => (float) $in,
-        //     'out_l_20' => (float) $out,
-        // ];
+        $d = $date->toDateString();
 
-        // For now return zeros so you don't get runtime issues before wiring:
+        // IN: loads into tank
+        $loadsIn = (float) Load::query()
+            ->where('tank_id', $tankId)
+            ->whereDate('date', $d)
+            ->sum('loaded_20_l');
+
+        // OUT: offloads from tank
+        $offloadsOut = (float) Offload::query()
+            ->where('tank_id', $tankId)
+            ->whereDate('date', $d)
+            ->sum('delivered_20_l');
+
+        // ADJ: signed (+ adds stock, - reduces stock)
+        $adj = (float) Adjustment::query()
+            ->where('tank_id', $tankId)
+            ->whereDate('date', $d)
+            ->sum('amount_20_l');
+
+        // Keep expected formula as: opening + in - out
+        // so we fold adjustments into in/out:
+        $in  = $loadsIn + max(0.0, $adj);
+        $out = $offloadsOut + max(0.0, -$adj);
+
         return [
-            'in_l_20'  => 0.0,
-            'out_l_20' => 0.0,
+            'in_l_20'  => round($in, 4),
+            'out_l_20' => round($out, 4),
         ];
     }
 }
