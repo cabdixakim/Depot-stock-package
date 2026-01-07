@@ -51,6 +51,24 @@
   };
 
   $winChip = $winLabel;
+
+  // -----------------------------
+  // Product filter (PATCH)
+  // -----------------------------
+  $products = $products ?? collect();
+  $activeProductId = $activeProductId ?? null; // null => all
+  $activeProductName = 'All Products';
+
+  if ($activeProductId) {
+    $p = $products->firstWhere('id', $activeProductId);
+    if ($p && isset($p->name)) $activeProductName = $p->name;
+  }
+
+  // preserve product param in preset links
+  $keepProduct = [];
+  if ($activeProductId) {
+    $keepProduct['product'] = $activeProductId;
+  }
 @endphp
 
 {{-- Soft background glows --}}
@@ -76,25 +94,56 @@
         <div class="p-4 space-y-3">
           {{-- Quick presets --}}
           <div class="flex flex-wrap gap-2">
-            <a href="{{ route('depot.dashboard', ['preset' => 'all_time']) }}"
+            <a href="{{ route('depot.dashboard', array_merge(['preset' => 'all_time'], $keepProduct)) }}"
                class="px-3 py-1.5 rounded-full text-xs font-medium transition
                {{ $isPreset('all_time') ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
               All Time
             </a>
-            <a href="{{ route('depot.dashboard', ['preset' => 'this_month']) }}"
+            <a href="{{ route('depot.dashboard', array_merge(['preset' => 'this_month'], $keepProduct)) }}"
                class="px-3 py-1.5 rounded-full text-xs font-medium transition
                {{ $isPreset('this_month') ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
               This Month
             </a>
-            <a href="{{ route('depot.dashboard', ['preset' => 'this_year']) }}"
+            <a href="{{ route('depot.dashboard', array_merge(['preset' => 'this_year'], $keepProduct)) }}"
                class="px-3 py-1.5 rounded-full text-xs font-medium transition
                {{ $isPreset('this_year') ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
               This Year
             </a>
           </div>
 
-          {{-- Manual range --}}
+          {{-- Product filter (PATCH) --}}
           <form method="GET" class="space-y-3">
+            {{-- preserve preset if present --}}
+            @if($activePreset)
+              <input type="hidden" name="preset" value="{{ $activePreset }}">
+            @endif
+
+            <div>
+              <label class="block text-[11px] text-gray-500">Product</label>
+              <div class="mt-1 relative overflow-hidden rounded-xl border border-gray-200/80 bg-white/70">
+                <select name="product"
+                        class="w-full appearance-none bg-transparent pl-3 pr-9 py-2 focus:border-indigo-400 focus:outline-none focus:ring-0 text-sm">
+                  <option value="all" {{ !$activeProductId ? 'selected' : '' }}>All Products</option>
+                  @foreach($products as $p)
+                    <option value="{{ $p->id }}" {{ (string)$activeProductId === (string)$p->id ? 'selected' : '' }}>
+                      {{ $p->name }}
+                    </option>
+                  @endforeach
+                </select>
+                <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
+                  <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                          d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                          clip-rule="evenodd" />
+                  </svg>
+                </span>
+              </div>
+              <div class="mt-1 text-[11px] text-gray-400">
+                Affects Stock/Offloads/Loads/Profit + Client stock snapshot. Billing is unchanged.
+              </div>
+            </div>
+
+            {{-- Manual range --}}
             <div class="grid grid-cols-1 gap-3">
               <div>
                 <label class="block text-[11px] text-gray-500">From</label>
@@ -107,6 +156,7 @@
                        class="mt-1 w-full rounded-xl border border-gray-200/80 bg-white/70 px-3 py-2 focus:border-indigo-400 focus:outline-none focus:ring-0 text-sm">
               </div>
             </div>
+
             <div class="flex items-center gap-2 pt-2">
               <button class="rounded-xl bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 text-white px-3 py-2 text-sm w-full shadow-sm hover:shadow-md hover:opacity-95 transition">
                 Apply
@@ -148,8 +198,9 @@
         $pct    = fn($v)=> round(min(100, ($maxBar>0 ? (abs($v)/$maxBar)*100 : 0)));
         $poolUp = $winNet >= 0;
       @endphp
-      
-      @if($isAdmin)<div class="rounded-2xl p-[1px] bg-gradient-to-br from-slate-200/70 via-slate-100 to-white">
+
+      @if($isAdmin)
+      <div class="rounded-2xl p-[1px] bg-gradient-to-br from-slate-200/70 via-slate-100 to-white">
         <div class="rounded-2xl bg-white/85 backdrop-blur p-4 ring-1 ring-slate-100 shadow-sm transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div class="flex items-center justify-between gap-3">
             <div class="text-[11px] uppercase tracking-wide text-slate-600 whitespace-nowrap">Depot Pool</div>
@@ -222,7 +273,15 @@
                 </span>
                 <span class="text-sm text-white/60 hidden sm:inline">Dashboard</span>
               </h1>
+
+              {{-- Product chip (PATCH) --}}
+              <div class="mt-2 inline-flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-xl bg-white/10 text-white/80 text-[11px] ring-1 ring-white/20 whitespace-nowrap backdrop-blur-sm">
+                  {{ $activeProductName }}
+                </span>
+              </div>
             </div>
+
             <span class="px-3 py-1 rounded-xl bg-white/10 text-white/80 text-xs ring-1 ring-white/20 whitespace-nowrap backdrop-blur-sm">
               {{ $winLabel }}
             </span>

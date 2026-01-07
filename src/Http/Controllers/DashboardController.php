@@ -24,6 +24,18 @@ class DashboardController extends Controller
         $today = Carbon::today();
 
         // -------------------------------------------------
+        // Product scope (UI-only filter, affects movement/stock KPIs only)
+        // -------------------------------------------------
+        $productParam = $r->input('product', 'all');
+        $activeProductId = null;
+        if ($productParam !== null && $productParam !== '' && $productParam !== 'all') {
+            $activeProductId = (int) $productParam;
+            if ($activeProductId <= 0) {
+                $activeProductId = null;
+            }
+        }
+
+        // -------------------------------------------------
         // Quick presets vs manual From/To
         // -------------------------------------------------
         $userSetFrom = $r->filled('from');
@@ -81,9 +93,34 @@ class DashboardController extends Controller
         $activeDepotId = session('depot.active_id'); // null => all
         $activeDepot   = $activeDepotId ? Depot::find($activeDepotId) : null;
 
-        $byDepotMove = function ($q) use ($activeDepotId) {
-            if ($activeDepotId) {
-                $q->whereHas('tank', fn($t) => $t->where('depot_id', $activeDepotId));
+        // -------------------------------------------------
+        // Build product list for dropdown (from tanks in scope)
+        // -------------------------------------------------
+        $productsQ = DB::table('tanks')
+            ->join('products', 'products.id', '=', 'tanks.product_id')
+            ->select('products.id', 'products.name')
+            ->distinct()
+            ->orderBy('products.name');
+
+        if ($activeDepotId) {
+            $productsQ->where('tanks.depot_id', $activeDepotId);
+        }
+
+        $products = $productsQ->get();
+
+        // -------------------------------------------------
+        // Scope helpers (Depot + Product)
+        // -------------------------------------------------
+        $byDepotMove = function ($q) use ($activeDepotId, $activeProductId) {
+            if ($activeDepotId || $activeProductId) {
+                $q->whereHas('tank', function ($t) use ($activeDepotId, $activeProductId) {
+                    if ($activeDepotId) {
+                        $t->where('depot_id', $activeDepotId);
+                    }
+                    if ($activeProductId) {
+                        $t->where('product_id', $activeProductId);
+                    }
+                });
             }
             return $q;
         };
@@ -192,7 +229,7 @@ class DashboardController extends Controller
             : ($profitAmount > 0 ? 100.0 : 0.0);
 
         // -------------------------------------------------
-        // Depot pool (window + all-time)
+        // Depot pool (window + all-time)  [UNCHANGED: pool is not product-based]
         // -------------------------------------------------
         $poolIn  = (float) $byDepotPool(
                         DepotPoolEntry::query()->where('type','in')
@@ -219,6 +256,7 @@ class DashboardController extends Controller
 
         // -------------------------------------------------
         // Client snapshot (window movements + all-time stock)
+        //   NOTE: invoices/payments NOT product-filtered (by design for now)
         // -------------------------------------------------
         $clients = Client::select('id','name','code')->orderBy('name')->get();
 
@@ -332,6 +370,10 @@ class DashboardController extends Controller
             'filter_to'          => $filterTo,
             'label_mode'         => $labelMode,
             'preset'             => $activePreset,
+
+            // Product filter data
+            'products'           => $products,
+            'activeProductId'    => $activeProductId, // null => all
 
             'clients_count'      => $clientsCount,
             'open_invoices'      => $openInvoices,
