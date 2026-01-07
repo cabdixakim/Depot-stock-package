@@ -592,6 +592,39 @@
         </div>
     </div>
 </div>
+
+{{-- LIGHT CONFIRM MODAL (PATCH) --}}
+<div id="lockConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="w-full max-w-sm rounded-2xl border border-white/60 bg-white/95 shadow-2xl">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <div class="flex items-start gap-3">
+                <div class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16Zm3.78-9.03a.75.75 0 00-1.06-1.06L9.25 11.38 7.28 9.41a.75.75 0 10-1.06 1.06l2.5 2.5a.75.75 0 001.06 0l4-4Z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-gray-900">Lock this day?</h3>
+                    <p class="mt-1 text-xs text-gray-500">
+                        You will not be able to edit dips afterwards.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-5 py-4 flex items-center justify-end gap-2">
+            <button type="button" data-lock-confirm-cancel
+                    class="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition">
+                Cancel
+            </button>
+
+            <button type="button" data-lock-confirm-ok
+                    class="px-4 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 active:scale-[0.98] transition">
+                Yes, lock day
+            </button>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -763,51 +796,86 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Lock day (still using JS confirm for now)
+    // Lock day (PATCH: light confirm modal instead of browser confirm)
+    const lockConfirmModal = document.getElementById('lockConfirmModal');
+    const lockConfirmCancel = lockConfirmModal?.querySelector('[data-lock-confirm-cancel]');
+    const lockConfirmOk = lockConfirmModal?.querySelector('[data-lock-confirm-ok]');
+
+    function openLockConfirm() {
+        lockConfirmModal?.classList.remove('hidden');
+    }
+    function closeLockConfirm() {
+        lockConfirmModal?.classList.add('hidden');
+    }
+
+    lockConfirmCancel?.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeLockConfirm();
+    });
+
+    // click outside closes
+    lockConfirmModal?.addEventListener('click', (e) => {
+        if (e.target === lockConfirmModal) closeLockConfirm();
+    });
+
+    // ESC closes
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && lockConfirmModal && !lockConfirmModal.classList.contains('hidden')) {
+            closeLockConfirm();
+        }
+    });
+
     lockBtn?.addEventListener('click', async (e) => {
         e.preventDefault();
         const url = lockUrl;
         if (!url || !currentTankId) return;
 
-        if (!confirm('Lock this day for this tank? You will not be able to edit dips afterwards.')) {
-            return;
-        }
+        openLockConfirm();
 
-        lockBtn.disabled = true;
-        lockBtn.textContent = 'Locking…';
+        // bind one-time OK handler per open
+        const handler = async (ev) => {
+            ev.preventDefault();
+            lockConfirmOk?.removeEventListener('click', handler);
+            closeLockConfirm();
 
-        try {
-            const formData = new FormData();
-            formData.append('tank_id', currentTankId);
+            lockBtn.disabled = true;
+            lockBtn.textContent = 'Locking…';
 
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-                        || form.querySelector('input[name=_token]').value,
-                    'Accept': 'application/json',
-                },
-                body: formData,
-            });
+            try {
+                const formData = new FormData();
+                formData.append('tank_id', currentTankId);
 
-            if (!resp.ok) {
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                            || form.querySelector('input[name=_token]').value,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+
+                if (!resp.ok) {
+                    lockBtn.disabled = false;
+                    lockBtn.textContent = 'Lock day';
+                    return;
+                }
+
+                const data = await resp.json();
+                if (data && data.ok) {
+                    window.location.reload();
+                } else {
+                    lockBtn.disabled = false;
+                    lockBtn.textContent = 'Lock day';
+                }
+            } catch (err) {
                 lockBtn.disabled = false;
                 lockBtn.textContent = 'Lock day';
-                return;
             }
+        };
 
-            const data = await resp.json();
-            if (data && data.ok) {
-                window.location.reload();
-            } else {
-                lockBtn.disabled = false;
-                lockBtn.textContent = 'Lock day';
-            }
-        } catch (err) {
-            lockBtn.disabled = false;
-            lockBtn.textContent = 'Lock day';
-        }
+        lockConfirmOk?.addEventListener('click', handler);
     });
 });
 </script>
