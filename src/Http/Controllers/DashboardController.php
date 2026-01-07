@@ -93,20 +93,15 @@ class DashboardController extends Controller
         $activeDepotId = session('depot.active_id'); // null => all
         $activeDepot   = $activeDepotId ? Depot::find($activeDepotId) : null;
 
+       
         // -------------------------------------------------
-        // Build product list for dropdown (from tanks in scope)
-        // -------------------------------------------------
-        $productsQ = DB::table('tanks')
-            ->join('products', 'products.id', '=', 'tanks.product_id')
-            ->select('products.id', 'products.name')
-            ->distinct()
-            ->orderBy('products.name');
-
-        if ($activeDepotId) {
-            $productsQ->where('tanks.depot_id', $activeDepotId);
-        }
-
-        $products = $productsQ->get();
+            // -------------------------------------------------
+            // Build product list for dropdown (UI-only; show all products)
+            // -------------------------------------------------
+            $products = DB::table('products')
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
 
         // -------------------------------------------------
         // Scope helpers (Depot + Product)
