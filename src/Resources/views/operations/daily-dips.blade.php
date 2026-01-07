@@ -72,6 +72,9 @@
             'date'  => $forDate->toDateString(),
         ])
         : '';
+
+    // PATCH: lock flag for disabling actions
+    $isLocked = (bool) ($currentDay && $currentDay->status === 'locked');
 @endphp
 
 <div class="space-y-6">
@@ -81,7 +84,7 @@
                 Daily dips
             </h1>
             <p class="mt-0.5 text-xs text-gray-500">
-                {{ $forDate->toDateString() }} 
+                {{ $forDate->toDateString() }}
             </p>
         </div>
 
@@ -377,7 +380,9 @@
                             data-temperature="{{ $openingDip->temperature_c ?? '' }}"
                             data-density="{{ $openingDip->density_kg_l ?? '' }}"
                             data-note="{{ $openingDip->note ?? '' }}"
-                            class="mt-4 inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-[0.97]"
+                            @if($isLocked) disabled aria-disabled="true" @endif
+                            class="mt-4 inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-[0.97]
+                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed hover:bg-indigo-600 active:scale-100 @endif"
                         >
                             {{ $hasOpening ? 'Edit opening dip' : 'Record opening dip' }}
                         </button>
@@ -410,7 +415,9 @@
                             data-temperature="{{ $closingDip->temperature_c ?? '' }}"
                             data-density="{{ $closingDip->density_kg_l ?? '' }}"
                             data-note="{{ $closingDip->note ?? '' }}"
-                            class="mt-4 inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.97]"
+                            @if($isLocked) disabled aria-disabled="true" @endif
+                            class="mt-4 inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.97]
+                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed hover:bg-emerald-600 active:scale-100 @endif"
                         >
                             {{ $hasClosing ? 'Edit closing dip' : 'Record closing dip' }}
                         </button>
@@ -647,6 +654,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const lockUrl    = "{{ $lockUrl }}";
     const currentTankId = "{{ $currentTank->id ?? '' }}";
 
+    // PATCH: server-known lock state
+    const isLocked = {{ $isLocked ? 'true' : 'false' }};
+
     // Filter: reset date back to real today and submit
     const filterForm = document.getElementById('dipsFilterForm');
     const dateInput  = filterForm?.querySelector('input[name="date"]');
@@ -722,12 +732,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnOpening?.addEventListener('click', (e) => {
         e.preventDefault();
+        // PATCH: hard stop if locked (extra safety)
+        if (isLocked) return;
+
         const mode = btnOpening.dataset.dipMode || 'create';
         openModal('opening', mode, btnOpening);
     });
 
     btnClosing?.addEventListener('click', (e) => {
         e.preventDefault();
+        // PATCH: hard stop if locked (extra safety)
+        if (isLocked) return;
+
         const mode = btnClosing.dataset.dipMode || 'create';
         openModal('closing', mode, btnClosing);
     });
@@ -744,6 +760,13 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         errorsEl.classList.add('hidden');
         errorsEl.textContent = '';
+
+        // PATCH: extra safety (should never happen because buttons disabled)
+        if (isLocked) {
+            errorsEl.textContent = 'Day is locked. Dips are read-only.';
+            errorsEl.classList.remove('hidden');
+            return;
+        }
 
         if (!form.action) {
             return;
