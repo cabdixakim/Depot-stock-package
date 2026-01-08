@@ -12,6 +12,10 @@
     $canManage   = $isAdmin || $isAccount;
 
     $fmt = fn($v) => number_format((float)$v, 2, '.', ',');
+
+    // Product filter (safe defaults)
+    $activeProductId = $activeProductId ?? null; // null => all
+    $products = $products ?? collect();
 @endphp
 
 <div class="min-h-[100dvh] bg-[#F7FAFC]">
@@ -44,6 +48,26 @@
               </svg>
             </span>
           </div>
+
+          {{-- Product filter (NEW) --}}
+          <div class="hidden sm:block">
+            <select name="product"
+              class="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
+              <option value="all" @selected($activeProductId === null)>All products</option>
+              @foreach($products as $p)
+                <option value="{{ $p->id }}" @selected((int)($activeProductId ?? 0) === (int)$p->id)>
+                  {{ $p->name }}
+                </option>
+              @endforeach
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            class="hidden sm:inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50">
+            Apply
+          </button>
+
           <a href="{{ route('depot.clients.index') }}"
              class="hidden sm:inline-flex text-[11px] text-slate-500 hover:text-slate-700">
             Reset
@@ -63,6 +87,23 @@
         @endif
       </div>
     </div>
+
+    {{-- Mobile product filter row (NEW) --}}
+    <div class="sm:hidden px-4 pb-3">
+      <form method="GET" class="flex gap-2">
+        <input type="hidden" name="q" value="{{ $q ?? '' }}">
+        <select name="product"
+          class="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
+          <option value="all" @selected($activeProductId === null)>All products</option>
+          @foreach($products as $p)
+            <option value="{{ $p->id }}" @selected((int)($activeProductId ?? 0) === (int)$p->id)>
+              {{ $p->name }}
+            </option>
+          @endforeach
+        </select>
+        <button class="h-9 rounded-xl bg-slate-900 px-3 text-sm text-white">Go</button>
+      </form>
+    </div>
   </div>
 
   {{-- ===== Body ===== --}}
@@ -81,6 +122,11 @@
         <div class="text-xs md:text-[13px]">
           See how much of each client’s <span class="font-semibold">physical stock</span> is actually
           <span class="font-semibold">cleared &amp; ready to load</span>, and lock loading/offloading when needed.
+          @if($activeProductId)
+            <span class="ml-2 inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[11px]">
+              Filtered by product
+            </span>
+          @endif
         </div>
       </div>
       <div class="text-[11px] text-slate-300 text-right">
@@ -413,7 +459,7 @@
     </div>
 
     <div>
-      {{ $clients->links() }}
+      {{ $clients->withQueryString()->links() }}
     </div>
   </div>
 </div>
