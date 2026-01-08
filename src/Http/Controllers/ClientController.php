@@ -106,6 +106,37 @@ class ClientController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
+        // -------------------------------------------------
+        // Product filter (UX only on this page)
+        // name="product" => 'all' or product_id
+        // -------------------------------------------------
+        $productParam = $request->query('product', 'all');
+        $activeProductId = null;
+        if ($productParam !== null && $productParam !== '' && $productParam !== 'all') {
+            $activeProductId = (int) $productParam;
+            if ($activeProductId <= 0) $activeProductId = null;
+        }
+
+        // -------------------------------------------------
+        // Build product list for dropdown (from tanks in depot scope)
+        // -------------------------------------------------
+        $activeDepotId = session('depot.active_id'); // null => all depots
+
+        $productsQ = DB::table('tanks')
+            ->join('products', 'products.id', '=', 'tanks.product_id')
+            ->select('products.id', 'products.name')
+            ->distinct()
+            ->orderBy('products.name');
+
+        if ($activeDepotId) {
+            $productsQ->where('tanks.depot_id', $activeDepotId);
+        }
+
+        $products = $productsQ->get();
+
+        // -------------------------------------------------
+        // Clients list
+        // -------------------------------------------------
         $clients = Client::query()
             ->when($q !== '', function ($qq) use ($q) {
                 $qq->where(function ($w) use ($q) {
@@ -119,13 +150,17 @@ class ClientController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        // 🔹 build risk snapshots using your service
+        // 🔹 build risk snapshots using your service (service reads request('product') too)
         $riskSnapshots = $riskService->forCollection($clients);
 
         return view('depot-stock::clients.index', [
-            'clients'       => $clients,
-            'q'             => $q,
-            'riskSnapshots' => $riskSnapshots,
+            'clients'         => $clients,
+            'q'               => $q,
+            'riskSnapshots'   => $riskSnapshots,
+
+            // product filter props
+            'products'        => $products,
+            'activeProductId' => $activeProductId,
         ]);
     }
 
@@ -384,20 +419,9 @@ class ClientController extends Controller
     // STORAGE CHARGE + GRACE
     // ======================================================
 
-    /**
-     * Called from the index page when you click "Charge storage".
-     * POST /depot/clients/{client}/storage-charge
-     * Route name: depot.clients.storage.charge
-     *
-     * Front-end sends:
-     *  - idle_litres     (number)
-     *  - rate_per_1000   (number, per 1000 L per month)
-     *  - months          (int)
-     *  - expected_amount (number)  ← just for reference, we recompute anyway
-     */
     public function storeStorageCharge(Request $request, Client $client)
     {
-        // validate what the modal actually sends
+        // ... (UNCHANGED)
         $data = $request->validate([
             'idle_litres'     => 'required|numeric|min:0.01',
             'rate_per_1000'   => 'required|numeric|min:0',
@@ -407,43 +431,37 @@ class ClientController extends Controller
         ]);
 
         $idleLitres   = (float) $data['idle_litres'];
-        $ratePer1000  = (float) $data['rate_per_1000']; // USD per 1000 L per month
+        $ratePer1000  = (float) $data['rate_per_1000'];
         $months       = (int) ($data['months'] ?? 1);
         if ($months <= 0) $months = 1;
 
         $ratePerLitre = $ratePer1000 / 1000.0;
-
-        // total = litres/1000 * rate_per_1000 * months
         $amount = round(($idleLitres / 1000.0) * $ratePer1000 * $months, 2);
         $currency = 'USD';
 
         try {
             DB::beginTransaction();
 
-            // Storage window: simple 30 days back from today
             $today    = Carbon::today();
             $fromDate = $today->copy()->subDays(30);
             $toDate   = $today->copy();
 
-            // === 1) Create INVOICE ===
             $storageNumber = 'STG-' . now()->format('Ymd-His');
 
-            /** @var Invoice $invoice */
             $invoice = Invoice::create([
                 'client_id' => $client->id,
                 'number'    => $storageNumber,
                 'date'      => $toDate->toDateString(),
                 'status'    => 'draft',
                 'currency'  => $currency,
-                'total'     => $amount, // required (no default in DB)
+                'total'     => $amount,
                 'notes'     => 'Storage invoice for idle stock created from clients dashboard.',
             ]);
 
-            // === 2) Create INVOICE ITEM ===
             InvoiceItem::create([
                 'invoice_id'     => $invoice->id,
                 'client_id'      => $client->id,
-                'source_type'    => 'storage',  // must exist in enum
+                'source_type'    => 'storage',
                 'source_id'      => 0,
                 'date'           => $toDate->toDateString(),
                 'description'    => sprintf(
@@ -464,18 +482,16 @@ class ClientController extends Controller
                 ]),
             ]);
 
-            // Recalculate invoice totals if method exists
             if (method_exists($invoice, 'recalculateTotals')) {
                 $invoice->refresh();
                 $invoice->recalculateTotals();
             }
 
-            // === 3) Create CLIENT STORAGE RECORD ===
             ClientStorageCharge::create([
                 'client_id'        => $client->id,
                 'from_date'        => $fromDate->toDateString(),
                 'to_date'          => $toDate->toDateString(),
-                'cleared_litres'   => 0,               // will be filled when payment is done
+                'cleared_litres'   => 0,
                 'uncleared_litres' => $idleLitres,
                 'total_litres'     => $idleLitres,
                 'fee_amount'       => $amount,
@@ -483,7 +499,6 @@ class ClientController extends Controller
                 'notes'            => $data['notes']
                     ?? 'Auto-created from clients dashboard for idle storage.',
                 'invoice_id'       => $invoice->id,
-                // 'paid_at' remains null until invoice is paid
             ]);
 
             DB::commit();
@@ -514,14 +529,9 @@ class ClientController extends Controller
         }
     }
 
-    /**
-     * Dummy “extend grace” handler for now – you can wire real logic later.
-     * POST /depot/clients/{client}/storage-extend
-     * Route name: depot.clients.storage.extend
-     */
     public function extendStorageGrace(Request $request, Client $client)
     {
-        // For now we simply acknowledge; you can later add a per-client grace flag.
+        // ... (UNCHANGED)
         if ($request->expectsJson()) {
             return response()->json([
                 'ok'      => true,

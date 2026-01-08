@@ -38,6 +38,34 @@ class ClientRiskService
         }
 
         // ------------------------------------------------------------------
+        // 0.5) ACTIVE PRODUCT CONTEXT (UI product filter on clients index)
+        // ------------------------------------------------------------------
+        $productParam = request('product', 'all');
+        $activeProductId = null;
+
+        if ($productParam !== null && $productParam !== '' && $productParam !== 'all') {
+            $activeProductId = (int) $productParam;
+            if ($activeProductId <= 0) {
+                $activeProductId = null;
+            }
+        }
+
+        // Apply product scope via tank relation (Offloads/Loads/Adjustments)
+        if ($activeProductId) {
+            $offQ->whereHas('tank', function ($t) use ($activeProductId) {
+                $t->where('product_id', $activeProductId);
+            });
+
+            $loadQ->whereHas('tank', function ($t) use ($activeProductId) {
+                $t->where('product_id', $activeProductId);
+            });
+
+            $adjQ->whereHas('tank', function ($t) use ($activeProductId) {
+                $t->where('product_id', $activeProductId);
+            });
+        }
+
+        // ------------------------------------------------------------------
         // 1) PHYSICAL STOCK
         //      physical = (delivered - allowance) - loads + adjustments
         // ------------------------------------------------------------------
