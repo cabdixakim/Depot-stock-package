@@ -122,7 +122,7 @@ class ClientController extends Controller
         // -------------------------------------------------
         $activeDepotId = session('depot.active_id'); // null => all depots
 
-        $productsQ =  Product::query()
+        $products =  Product::query()
             ->select('id','name')
             ->orderBy('name')
             ->get();
