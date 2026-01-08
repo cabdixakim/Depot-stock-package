@@ -127,11 +127,11 @@ class ClientController extends Controller
             ->orderBy('name')
             ->get();
 
-        if ($activeDepotId) {
-            $productsQ->where('tanks.depot_id', $activeDepotId);
-        }
+        // if ($activeDepotId) {
+        //     $productsQ->where('tanks.depot_id', $activeDepotId);
+        // }
 
-        $products = $productsQ->get();
+        // $products = $productsQ->get();
 
         // -------------------------------------------------
         // Clients list
