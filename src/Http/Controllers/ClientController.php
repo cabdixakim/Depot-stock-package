@@ -122,11 +122,10 @@ class ClientController extends Controller
         // -------------------------------------------------
         $activeDepotId = session('depot.active_id'); // null => all depots
 
-        $productsQ = DB::table('tanks')
-            ->join('products', 'products.id', '=', 'tanks.product_id')
-            ->select('products.id', 'products.name')
-            ->distinct()
-            ->orderBy('products.name');
+        $productsQ =  Product::query()
+            ->select('id','name')
+            ->orderBy('name')
+            ->get();
 
         if ($activeDepotId) {
             $productsQ->where('tanks.depot_id', $activeDepotId);
