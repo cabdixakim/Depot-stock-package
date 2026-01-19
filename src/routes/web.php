@@ -266,29 +266,29 @@ Route::middleware(['web','auth', 'role:admin,compliance,accountant'])
     ->name('clearances.data');
 
         Route::get('/clearances/create', [ClearanceController::class, 'create'])
-            ->middleware('role:admin,compliance')
+            ->middleware('role:admin,compliance,owner')
             ->name('clearances.create');
 
         Route::post('/clearances', [ClearanceController::class, 'store'])
-            ->middleware('role:admin,compliance')
+            ->middleware('role:admin,compliance,owner')
             ->name('clearances.store');
 
         Route::get('/clearances/{clearance}', [ClearanceController::class, 'show'])
             ->name('clearances.show');
 
         Route::post('/clearances/{clearance}/submit', [ClearanceController::class, 'submit'])
-            ->middleware('role:admin,compliance')
+            ->middleware('role:admin,compliance,owner')
             ->name('clearances.submit');
 
         Route::post('/clearances/{clearance}/issue-tr8', [ClearanceController::class, 'issueTr8'])
-            ->middleware('role:admin,compliance')
+            ->middleware('role:admin,compliance,owner')
             ->name('clearances.issue_tr8');
 
         Route::post('/clearances/{clearance}/arrive', [ClearanceController::class, 'markArrived'])
-            ->middleware('role:admin,compliance')
+            ->middleware('role:admin,compliance,owner')
             ->name('clearances.arrive');
 
         Route::post('/clearances/{clearance}/cancel', [ClearanceController::class, 'cancel'])
-            ->middleware('role:admin,compliance')
+            ->middleware('role:admin,compliance,owner')
             ->name('clearances.cancel');
     });
