@@ -4,32 +4,30 @@
 @php
     use Carbon\Carbon;
 
-    // Safe defaults so the view never explodes if controller hasn't wired stats yet.
-    $qs = request()->query();
-
+    // If controller doesn't pass these yet, the view stays safe.
     $stats = $stats ?? [
-        'total' => $stats['total'] ?? null,
-        'draft' => $stats['draft'] ?? null,
-        'submitted' => $stats['submitted'] ?? null,
-        'tr8_issued' => $stats['tr8_issued'] ?? null,
-        'arrived' => $stats['arrived'] ?? null,
-        'offloaded' => $stats['offloaded'] ?? null,
-        'cancelled' => $stats['cancelled'] ?? null,
-        // attention
-        'stuck_submitted' => $stats['stuck_submitted'] ?? null,
-        'stuck_tr8_issued' => $stats['stuck_tr8_issued'] ?? null,
-        'missing_tr8_number' => $stats['missing_tr8_number'] ?? null,
-        'missing_docs' => $stats['missing_docs'] ?? null,
+        'total' => null,
+        'draft' => null,
+        'submitted' => null,
+        'tr8_issued' => null,
+        'arrived' => null,
+        'offloaded' => null,
+        'cancelled' => null,
+        'stuck_submitted' => null,
+        'stuck_tr8_issued' => null,
+        'missing_tr8_number' => null,
+        'missing_docs' => null,
     ];
 
-    // Thresholds (tweak later)
-    $submittedStaleHours = $submittedStaleHours ?? 24; // > 24h in "submitted" = attention
-    $tr8IssuedStaleHours = $tr8IssuedStaleHours ?? 24; // > 24h in "tr8_issued" and not arrived = attention
+    $submittedStaleHours = $submittedStaleHours ?? 24;
+    $tr8IssuedStaleHours = $tr8IssuedStaleHours ?? 24;
 
-    // If controller passes attention rows, great. If not, keep empty.
+    // optional: controller can pass an attention collection
     $attention = $attention ?? collect();
+    // optional: controller can pass clients collection for filter dropdown
+    $clients = $clients ?? collect();
 
-    // Helper
+    // Helper functions for badges
     $badgeClass = function ($status) {
         return match ($status) {
             'draft' => 'bg-secondary',
@@ -45,10 +43,6 @@
     $statusLabel = function ($status) {
         return strtoupper(str_replace('_', ' ', (string)$status));
     };
-
-    // Preserve filters for export links
-    $exportXlsxUrl = route('depot.compliance.clearances.export_xlsx', $qs) ?? null;
-    $exportPdfUrl  = route('depot.compliance.clearances.export_pdf', $qs) ?? null;
 @endphp
 
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -58,15 +52,13 @@
     </div>
 
     <div class="d-flex gap-2">
-        {{-- Export buttons (server-side endpoints; wire later if not yet created) --}}
-        <a class="btn btn-outline-secondary btn-sm"
-           href="{{ route('depot.compliance.clearances.export_xlsx', request()->query()) }}">
+        {{-- ✅ Client-side export buttons (NO routes) --}}
+        <button id="export-xlsx" type="button" class="btn btn-outline-secondary btn-sm">
             Export Excel
-        </a>
-        <a class="btn btn-outline-secondary btn-sm"
-           href="{{ route('depot.compliance.clearances.export_pdf', request()->query()) }}">
+        </button>
+        <button id="export-pdf" type="button" class="btn btn-outline-secondary btn-sm">
             Export PDF
-        </a>
+        </button>
 
         @if(auth()->user()->hasRole('admin|compliance'))
             <a class="btn btn-primary btn-sm" href="{{ route('depot.compliance.clearances.create') }}">
@@ -86,9 +78,9 @@
                     <div class="h5 mb-0">{{ $stats['total'] ?? '—' }}</div>
                 </div>
                 <div class="text-muted small text-end">
-                    <div>Active = Draft + Submitted + TR8 Issued + Arrived</div>
+                    <div>Active</div>
                     <div class="fw-semibold">
-                        {{ ($stats['draft'] ?? 0) + ($stats['submitted'] ?? 0) + ($stats['tr8_issued'] ?? 0) + ($stats['arrived'] ?? 0) ?: '—' }}
+                        {{ (($stats['draft'] ?? 0) + ($stats['submitted'] ?? 0) + ($stats['tr8_issued'] ?? 0) + ($stats['arrived'] ?? 0)) ?: '—' }}
                     </div>
                 </div>
             </div>
@@ -138,7 +130,7 @@
                     <span class="badge bg-warning text-dark">{{ $stats['stuck_submitted'] ?? '—' }}</span>
                 </div>
                 <div class="text-muted small mt-1">
-                    These are waiting for TR8 issuance. Prioritise chasing agents/border.
+                    Waiting for TR8 issuance. Prioritise chasing agents/border.
                 </div>
             </div>
         </div>
@@ -174,13 +166,12 @@
                     <span class="badge bg-danger">{{ $stats['missing_docs'] ?? '—' }}</span>
                 </div>
                 <div class="text-muted small mt-1">
-                    Invoice / Delivery note / TR8 missing. Upload for audit readiness.
+                    Missing invoice / delivery note / TR8 uploads. Upload for audit readiness.
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- Optional: Attention list --}}
     @if($attention->count())
         <div class="border rounded bg-white mt-2">
             <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
@@ -232,7 +223,7 @@
             <label class="form-label small text-muted mb-1">Client</label>
             <select name="client_id" class="form-select form-select-sm">
                 <option value="">All Clients</option>
-                @foreach(($clients ?? []) as $c)
+                @foreach($clients as $c)
                     <option value="{{ $c->id }}" @selected((string)request('client_id') === (string)$c->id)>
                         {{ $c->name }}
                     </option>
@@ -272,146 +263,157 @@
     </form>
 </div>
 
-{{-- MAIN LIST --}}
+{{-- MAIN LIST (Tabulator container) --}}
 <div class="border rounded bg-white">
     <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
         <div class="fw-semibold">Clearances</div>
-        <small class="text-muted">
-            Showing {{ method_exists($clearances, 'firstItem') ? ($clearances->firstItem() ?? 0) : 0 }}
-            –
-            {{ method_exists($clearances, 'lastItem') ? ($clearances->lastItem() ?? 0) : 0 }}
-            of {{ method_exists($clearances, 'total') ? $clearances->total() : '—' }}
-        </small>
+        <small class="text-muted">Tip: filter above, then export.</small>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Status</th>
-                    <th>Client</th>
-                    <th>Truck / Trailer</th>
-                    <th class="text-end">Loaded @20°C</th>
-                    <th>TR8</th>
-                    <th>Border</th>
-                    <th>Submitted</th>
-                    <th>Issued</th>
-                    <th>Updated by</th>
-                    <th>Age</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($clearances as $c)
-                    @php
-                        $updatedAt = $c->updated_at ? Carbon::parse($c->updated_at) : null;
-                        $ageHuman = $updatedAt ? $updatedAt->diffForHumans(null, true) : '—';
-
-                        // Attention flags (purely visual)
-                        $isSubmittedStale = ($c->status === 'submitted' && $c->submitted_at && Carbon::parse($c->submitted_at)->diffInHours(now()) > $submittedStaleHours);
-                        $isTr8IssuedStale = ($c->status === 'tr8_issued' && $c->tr8_issued_at && Carbon::parse($c->tr8_issued_at)->diffInHours(now()) > $tr8IssuedStaleHours && empty($c->arrived_at));
-                        $rowWarn = $isSubmittedStale || $isTr8IssuedStale;
-                        $updatedBy = $c->updated_by_name ?? $c->last_action_by_name ?? '—';
-                    @endphp
-
-                    <tr @class(['table-warning' => $rowWarn])>
-                        <td>
-                            <span class="badge {{ $badgeClass($c->status) }}">
-                                {{ $statusLabel($c->status) }}
-                            </span>
-                            @if($isSubmittedStale)
-                                <div class="small text-danger mt-1">Late issuance</div>
-                            @endif
-                            @if($isTr8IssuedStale)
-                                <div class="small text-danger mt-1">Late arrival</div>
-                            @endif
-                        </td>
-
-                        <td>{{ $c->client->name ?? '—' }}</td>
-
-                        <td>
-                            <div class="fw-semibold">{{ $c->truck_number }}</div>
-                            <div class="text-muted small">{{ $c->trailer_number ?: '—' }}</div>
-                        </td>
-
-                        <td class="text-end">
-                            {{ is_null($c->loaded_20_l) ? '—' : number_format((float)$c->loaded_20_l, 3) }}
-                        </td>
-
-                        <td>
-                            <div class="fw-semibold">{{ $c->tr8_number ?: '—' }}</div>
-                            <div class="text-muted small">{{ $c->tr8_issued_at ? Carbon::parse($c->tr8_issued_at)->format('Y-m-d H:i') : '' }}</div>
-                        </td>
-
-                        <td>{{ $c->border_point ?: '—' }}</td>
-
-                        <td class="small">
-                            {{ $c->submitted_at ? Carbon::parse($c->submitted_at)->format('Y-m-d H:i') : '—' }}
-                        </td>
-
-                        <td class="small">
-                            {{ $c->tr8_issued_at ? Carbon::parse($c->tr8_issued_at)->format('Y-m-d H:i') : '—' }}
-                        </td>
-
-                        <td>{{ $updatedBy }}</td>
-
-                        <td class="small">{{ $ageHuman }}</td>
-
-                        <td class="text-end">
-                            <div class="d-inline-flex gap-1">
-                                <a class="btn btn-outline-secondary btn-sm"
-                                   href="{{ route('depot.compliance.clearances.show', $c) }}">
-                                    Open
-                                </a>
-
-                                @if(auth()->user()->hasRole('admin|compliance'))
-                                    @if($c->status === 'draft')
-                                        <form method="POST" action="{{ route('depot.compliance.clearances.submit', $c) }}">
-                                            @csrf
-                                            <button class="btn btn-warning btn-sm">Submit</button>
-                                        </form>
-                                    @endif
-
-                                    @if($c->status === 'submitted')
-                                        <a class="btn btn-success btn-sm"
-                                           href="{{ route('depot.compliance.clearances.show', $c) }}#issue-tr8">
-                                            Issue TR8
-                                        </a>
-                                    @endif
-
-                                    @if($c->status === 'tr8_issued')
-                                        <form method="POST" action="{{ route('depot.compliance.clearances.arrive', $c) }}">
-                                            @csrf
-                                            <button class="btn btn-primary btn-sm">Arrived</button>
-                                        </form>
-                                    @endif
-
-                                    @if(in_array($c->status, ['draft','submitted','tr8_issued','arrived'], true))
-                                        <form method="POST" action="{{ route('depot.compliance.clearances.cancel', $c) }}"
-                                              onsubmit="return confirm('Cancel this clearance?');">
-                                            @csrf
-                                            <button class="btn btn-outline-danger btn-sm">Cancel</button>
-                                        </form>
-                                    @endif
-                                @endif
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="11" class="text-center text-muted py-4">
-                            No clearances found for the current filters.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-
-    <div class="p-3">
-        @if(method_exists($clearances, 'links'))
-            {{ $clearances->withQueryString()->links() }}
-        @endif
+    <div class="p-2">
+        <div id="clearances-table"></div>
     </div>
 </div>
 @endsection
+
+@push('styles')
+<style>
+    /* Make Tabulator feel less “tabulator-y” */
+    #clearances-table .tabulator {
+        border: 0;
+        border-radius: 10px;
+    }
+    #clearances-table .tabulator-header {
+        border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+    #clearances-table .tabulator-row {
+        border-bottom: 1px solid rgba(0,0,0,.04);
+    }
+    #clearances-table .tabulator-row:hover {
+        background: rgba(0,0,0,.02);
+    }
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .15rem .55rem;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        border: 1px solid rgba(0,0,0,.08);
+    }
+    .pill-draft { background: rgba(108,117,125,.12); color: #495057; }
+    .pill-submitted { background: rgba(255,193,7,.18); color: #7a5b00; }
+    .pill-tr8_issued { background: rgba(13,202,240,.18); color: #055160; }
+    .pill-arrived { background: rgba(13,110,253,.12); color: #084298; }
+    .pill-offloaded { background: rgba(25,135,84,.12); color: #0f5132; }
+    .pill-cancelled { background: rgba(220,53,69,.12); color: #842029; }
+
+    .mini-btn {
+        padding: .15rem .45rem;
+        font-size: 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(0,0,0,.12);
+        background: white;
+        text-decoration: none;
+        color: inherit;
+    }
+    .mini-btn:hover { background: rgba(0,0,0,.03); }
+    .mini-btn-danger { border-color: rgba(220,53,69,.35); color: #b02a37; }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Build query params from the filter form (so table data respects current filters)
+    function currentQueryString() {
+        const params = new URLSearchParams(window.location.search);
+        return params.toString();
+    }
+
+    const tableEl = document.getElementById('clearances-table');
+    if (!tableEl || !window.Tabulator) return;
+
+    function statusPill(status) {
+        const s = (status || '').toString();
+        const cls = 'pill-' + s;
+        const label = s.replaceAll('_', ' ').toUpperCase();
+        return `<span class="status-pill ${cls}">${label || '—'}</span>`;
+    }
+
+    // ✅ Data endpoint: add this route later in controller (depot.compliance.clearances.data)
+    // For now we attempt to hit it; if it doesn't exist yet you’ll see 404 in network.
+    const dataUrl = `{{ route('depot.compliance.clearances.data') ?? '' }}`;
+
+    window.clearancesTable = new Tabulator(tableEl, {
+        layout: "fitColumns",
+        placeholder: "No clearances found for the current filters.",
+        pagination: true,
+        paginationSize: 20,
+        ajaxURL: dataUrl,
+        ajaxParams: function () {
+            const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
+            return params;
+        },
+        ajaxResponse: function(url, params, response){
+            // Accept either {data: []} or [] formats
+            if (Array.isArray(response)) return response;
+            return response.data || [];
+        },
+        columns: [
+            {title: "Status", field: "status", width: 140, formatter: function(cell){ return statusPill(cell.getValue()); }},
+            {title: "Client", field: "client_name", minWidth: 180},
+            {title: "Truck", field: "truck_number", minWidth: 140},
+            {title: "Trailer", field: "trailer_number", minWidth: 140},
+            {title: "Loaded @20°C", field: "loaded_20_l", hozAlign:"right", formatter:"money", formatterParams:{precision: 3}},
+            {title: "TR8", field: "tr8_number", minWidth: 120},
+            {title: "Border", field: "border_point", minWidth: 140},
+            {title: "Submitted", field: "submitted_at", minWidth: 160},
+            {title: "Issued", field: "tr8_issued_at", minWidth: 160},
+            {title: "Updated by", field: "updated_by_name", minWidth: 160},
+            {title: "Age", field: "age_human", minWidth: 110},
+            {
+                title: "Actions",
+                field: "id",
+                hozAlign: "right",
+                width: 220,
+                formatter: function(cell){
+                    const row = cell.getRow().getData();
+                    const openUrl = `{{ url('depot/compliance/clearances') }}/${row.id}`;
+                    let html = `<a class="mini-btn" href="${openUrl}">Open</a>`;
+
+                    @if(auth()->user()->hasRole('admin|compliance'))
+                        if (row.status === 'draft') {
+                            html += ` <a class="mini-btn" href="${openUrl}">Submit</a>`;
+                        } else if (row.status === 'submitted') {
+                            html += ` <a class="mini-btn" href="${openUrl}#issue-tr8">Issue TR8</a>`;
+                        } else if (row.status === 'tr8_issued') {
+                            html += ` <a class="mini-btn" href="${openUrl}">Arrived</a>`;
+                        }
+                        if (['draft','submitted','tr8_issued','arrived'].includes(row.status)) {
+                            html += ` <a class="mini-btn mini-btn-danger" href="${openUrl}">Cancel</a>`;
+                        }
+                    @endif
+
+                    return html;
+                }
+            },
+        ],
+    });
+
+    // ✅ Client-side exports
+    document.getElementById('export-xlsx')?.addEventListener('click', function () {
+        window.clearancesTable.download("xlsx", "compliance_clearances.xlsx");
+    });
+
+    document.getElementById('export-pdf')?.addEventListener('click', function () {
+        window.clearancesTable.download("pdf", "compliance_clearances.pdf", {
+            orientation: "landscape",
+            title: "Compliance Clearances",
+        });
+    });
+});
+</script>
+@endpush
