@@ -31,6 +31,11 @@ use Optima\DepotStock\Http\Controllers\DepotOperationsController;
 use Optima\DepotStock\Http\Controllers\DepotReconController;
 use Optima\DepotStock\Http\Controllers\OperationsClientController;
 
+//Compliance
+use Optima\DepotStock\Http\Controllers\Compliance\ClearanceController;
+
+
+
 // =========================================================
 // STAFF AREA (/depot/...)
 // =========================================================
@@ -247,4 +252,44 @@ Route::middleware(['web', 'auth', 'client.portal'])
         Route::get('/account',           [ClientPortalController::class, 'account'])->name('account');
         Route::post('/account/profile',  [ClientPortalController::class, 'updateProfile'])->name('account.profile');
         Route::post('/account/password', [ClientPortalController::class, 'updatePassword'])->name('account.password');
+    });
+
+
+//  =========================================================
+// COMPLIANCE MODULE ROUTES (/depot/compliance/...)
+//  =========================================================
+Route::middleware(['auth', 'role:admin,compliance,accountant'])
+    ->prefix('depot/compliance')
+    ->name('depot.compliance.')
+    ->group(function () {
+
+        Route::get('/clearances', [ClearanceController::class, 'index'])
+            ->name('clearances.index');
+
+        Route::get('/clearances/create', [ClearanceController::class, 'create'])
+            ->middleware('role:admin,compliance')
+            ->name('clearances.create');
+
+        Route::post('/clearances', [ClearanceController::class, 'store'])
+            ->middleware('role:admin,compliance')
+            ->name('clearances.store');
+
+        Route::get('/clearances/{clearance}', [ClearanceController::class, 'show'])
+            ->name('clearances.show');
+
+        Route::post('/clearances/{clearance}/submit', [ClearanceController::class, 'submit'])
+            ->middleware('role:admin,compliance')
+            ->name('clearances.submit');
+
+        Route::post('/clearances/{clearance}/issue-tr8', [ClearanceController::class, 'issueTr8'])
+            ->middleware('role:admin,compliance')
+            ->name('clearances.issue_tr8');
+
+        Route::post('/clearances/{clearance}/arrive', [ClearanceController::class, 'markArrived'])
+            ->middleware('role:admin,compliance')
+            ->name('clearances.arrive');
+
+        Route::post('/clearances/{clearance}/cancel', [ClearanceController::class, 'cancel'])
+            ->middleware('role:admin,compliance')
+            ->name('clearances.cancel');
     });
