@@ -401,7 +401,7 @@
 </style>
 @endpush
 
-@@push('scripts')
+@push('scripts')
 <script>
 document.addEventListener("DOMContentLoaded", function(){
     if (!window.Tabulator) {
