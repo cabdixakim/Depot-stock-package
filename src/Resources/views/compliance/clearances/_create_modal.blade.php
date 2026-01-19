@@ -101,17 +101,3 @@
         </form>
     </div>
 </div>
-
-<script>
-(function(){
-    const modal = document.getElementById("createClearanceModal");
-    if (!modal) return;
-
-    document.addEventListener("click", function(e){
-        const close = e.target.closest("[data-close-modal]");
-        if (!close) return;
-        modal.classList.add("hidden");
-        modal.classList.remove("flex");
-    });
-})();
-</script>
