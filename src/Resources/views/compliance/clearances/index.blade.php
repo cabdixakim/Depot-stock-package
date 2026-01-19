@@ -2,464 +2,400 @@
 
 @section('content')
 @php
+    // ------------------------------------------------------------
+    // SAFE DEFAULTS (avoid ugly "undefined" states)
+    // ------------------------------------------------------------
     $clients = $clients ?? collect();
+    $clearances = $clearances ?? null;
+
     $stats = $stats ?? [
-        'total' => 0, 'draft' => 0, 'submitted' => 0, 'tr8_issued' => 0, 'arrived' => 0, 'cancelled' => 0,
-        'stuck_submitted' => 0, 'stuck_tr8_issued' => 0, 'missing_tr8_number' => 0, 'missing_docs' => 0,
+        'total' => 0,
+        'draft' => 0,
+        'submitted' => 0,
+        'tr8_issued' => 0,
+        'arrived' => 0,
+        'cancelled' => 0,
+
+        'stuck_submitted' => 0,
+        'stuck_tr8_issued' => 0,
+        'missing_tr8_number' => 0,
+        'missing_documents' => 0,
     ];
 
-    $canCreate = auth()->user() && auth()->user()->hasRole(['admin', 'owner', 'compliance']);
+    // ------------------------------------------------------------
+    // ROLE GATING (YOUR User::hasRole expects STRING)
+    // ------------------------------------------------------------
+    $u = auth()->user();
+    $canCreate =
+        $u && (
+            $u->hasRole('admin') ||
+            $u->hasRole('owner') ||
+            $u->hasRole('compliance')
+        );
+
+    // ------------------------------------------------------------
+    // FILTERS (kept server-side for now, no JS route dependencies)
+    // ------------------------------------------------------------
+    $selectedClient = request('client_id', '');
+    $selectedStatus = request('status', '');
+    $search = request('q', '');
+
+    // if you haven't built date filtering yet, keep fields UI-only
+    $from = request('from', '');
+    $to = request('to', '');
+
+    $lastRefreshed = now()->format('n/j/Y, g:i:s A');
+
+    // nice label map
+    $statusLabels = [
+        '' => 'All statuses',
+        'draft' => 'Draft',
+        'submitted' => 'Submitted',
+        'tr8_issued' => 'TR8 Issued',
+        'arrived' => 'Arrived',
+        'cancelled' => 'Cancelled',
+    ];
+
+    $pillStatuses = [
+        ['key' => '', 'label' => 'All', 'count' => $stats['total'] ?? 0, 'tone' => 'neutral'],
+        ['key' => 'draft', 'label' => 'Draft', 'count' => $stats['draft'] ?? 0, 'tone' => 'slate'],
+        ['key' => 'submitted', 'label' => 'Submitted', 'count' => $stats['submitted'] ?? 0, 'tone' => 'amber'],
+        ['key' => 'tr8_issued', 'label' => 'TR8 Issued', 'count' => $stats['tr8_issued'] ?? 0, 'tone' => 'blue'],
+        ['key' => 'arrived', 'label' => 'Arrived', 'count' => $stats['arrived'] ?? 0, 'tone' => 'green'],
+        ['key' => 'cancelled', 'label' => 'Cancelled', 'count' => $stats['cancelled'] ?? 0, 'tone' => 'red'],
+    ];
 @endphp
 
-<div class="compliance-wrap">
+<style>
+    /* ===== Premium, minimal, app-matching (no Tailwind dependency) ===== */
+    .c-wrap{max-width:1200px;margin:0 auto;padding:16px 18px 28px;}
+    .c-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;}
+    .c-title{font-size:22px;font-weight:700;letter-spacing:-0.02em;margin:0;}
+    .c-sub{color:#6b7280;font-size:13px;margin-top:4px;max-width:720px;line-height:1.35;}
+    .c-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+    .c-meta{color:#6b7280;font-size:12px;white-space:nowrap;}
+
+    .c-btn{border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:10px;padding:8px 12px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;}
+    .c-btn:hover{border-color:rgba(0,0,0,.16);}
+    .c-btn-primary{background:#111827;color:#fff;border-color:#111827;}
+    .c-btn-primary:hover{filter:brightness(.96);}
+    .c-btn-ghost{background:rgba(17,24,39,.04);}
+    .c-btn-icon{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.08);background:#fff;}
+    .c-btn-icon:hover{border-color:rgba(0,0,0,.16);}
+
+    .c-card{background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:14px;box-shadow:0 1px 0 rgba(0,0,0,.02);}
+
+    .c-strip{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin:10px 0 14px;}
+    .pill{border-radius:999px;border:1px solid rgba(0,0,0,.08);padding:7px 10px;display:flex;gap:8px;align-items:center;background:#fff;cursor:pointer;user-select:none;}
+    .pill:hover{border-color:rgba(0,0,0,.16);}
+    .pill.active{border-color:rgba(17,24,39,.65);box-shadow:0 0 0 3px rgba(17,24,39,.08);}
+    .pill .k{font-size:12px;font-weight:700;color:#111827;}
+    .pill .v{font-size:12px;color:#6b7280;font-weight:700;background:rgba(0,0,0,.05);padding:2px 8px;border-radius:999px;}
+
+    .tone-neutral{background:rgba(17,24,39,.03);}
+    .tone-slate{background:rgba(100,116,139,.10);}
+    .tone-amber{background:rgba(245,158,11,.12);}
+    .tone-blue{background:rgba(59,130,246,.12);}
+    .tone-green{background:rgba(34,197,94,.12);}
+    .tone-red{background:rgba(239,68,68,.10);}
+
+    .c-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-bottom:14px;}
+    @media (max-width: 980px){.c-grid{grid-template-columns:1fr;}}
+
+    .c-attn{padding:14px;}
+    .c-attn h3{margin:0 0 8px;font-size:14px;font-weight:800;}
+    .attn-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+    @media (max-width: 980px){.attn-row{grid-template-columns:repeat(2,1fr);} }
+    @media (max-width: 520px){.attn-row{grid-template-columns:1fr;} }
+    .attn{border-radius:12px;border:1px solid rgba(0,0,0,.06);padding:10px 12px;background:rgba(17,24,39,.02);}
+    .attn .t{font-size:12px;color:#111827;font-weight:800;}
+    .attn .n{font-size:22px;font-weight:900;margin-top:4px;line-height:1;}
+    .attn .h{font-size:12px;color:#6b7280;margin-top:6px;line-height:1.25;}
+
+    .c-filters{padding:14px;}
+    .c-filters h3{margin:0 0 10px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:space-between;}
+    .f-row{display:grid;grid-template-columns:1fr 1fr 1.2fr .9fr .9fr;gap:10px;align-items:end;}
+    @media (max-width: 980px){.f-row{grid-template-columns:1fr 1fr;}}
+    .f{display:flex;flex-direction:column;gap:6px;}
+    .f label{font-size:12px;color:#6b7280;font-weight:700;}
+    .f input,.f select{border:1px solid rgba(0,0,0,.10);border-radius:10px;padding:9px 10px;font-size:13px;background:#fff;outline:none;}
+    .f input:focus,.f select:focus{border-color:rgba(17,24,39,.55);box-shadow:0 0 0 3px rgba(17,24,39,.08);}
+    .f-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px;}
+
+    .c-list{padding:14px;margin-top:12px;}
+    .c-list-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px;}
+    .c-list-head h3{margin:0;font-size:14px;font-weight:900;}
+    .c-list-head p{margin:3px 0 0;color:#6b7280;font-size:12px;}
+    .c-list-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+    .c-small{font-size:12px;color:#6b7280;}
+    .table{width:100%;border-collapse:separate;border-spacing:0;}
+    .table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;font-weight:800;text-align:left;padding:10px 10px;border-bottom:1px solid rgba(0,0,0,.07);background:rgba(17,24,39,.02);}
+    .table tbody td{padding:12px 10px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px;vertical-align:middle;}
+    .table tbody tr:hover td{background:rgba(17,24,39,.02);}
+    .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;border:1px solid rgba(0,0,0,.08);background:#fff;}
+    .dot{width:8px;height:8px;border-radius:999px;background:#9ca3af;}
+    .dot.draft{background:#64748b;}
+    .dot.submitted{background:#f59e0b;}
+    .dot.tr8_issued{background:#3b82f6;}
+    .dot.arrived{background:#22c55e;}
+    .dot.cancelled{background:#ef4444;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
+    .muted{color:#6b7280;font-size:12px;}
+    .row-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+    .link{font-weight:800;color:#111827;text-decoration:none;}
+    .link:hover{text-decoration:underline;}
+    .empty{padding:18px;border:1px dashed rgba(0,0,0,.15);border-radius:12px;background:rgba(17,24,39,.02);text-align:center;color:#6b7280;}
+</style>
+
+<div class="c-wrap">
 
     {{-- Header --}}
     <div class="c-head">
         <div>
-            <div class="c-title">Compliance</div>
-            <div class="c-subtitle">Clearances & TR8 tracking — chase what’s stuck, fix missing TR8/docs, and push trucks to offload.</div>
+            <h1 class="c-title">Compliance</h1>
+            <div class="c-sub">Clearances &amp; TR8 tracking. Chase what’s stuck, fix missing TR8/docs, and keep trucks moving.</div>
         </div>
 
-        <div class="c-head-actions">
-            <div class="c-refresh" id="last-refreshed">Last refreshed: —</div>
+        <div class="c-actions">
+            <div class="c-meta">Last refreshed: {{ $lastRefreshed }}</div>
+
+            {{-- Export buttons (client-side later; for now do nothing but exist) --}}
+            <button type="button" class="c-btn c-btn-ghost" id="export-xlsx">Export Excel</button>
+            <button type="button" class="c-btn c-btn-ghost" id="export-pdf">Export PDF</button>
+
             @if($canCreate)
-                <button class="btn btn-primary btn-sm c-btn" type="button" data-bs-toggle="modal" data-bs-target="#createClearanceModal">
+                <button type="button" class="c-btn c-btn-primary" data-bs-toggle="modal" data-bs-target="#createClearanceModal">
                     + New Clearance
                 </button>
             @endif
         </div>
     </div>
 
-    {{-- Status strip (clickable pills) --}}
-    <div class="c-strip">
-        <button class="pill pill-neutral js-status" data-status="">
-            <span>Total</span><strong>{{ (int)$stats['total'] }}</strong>
-        </button>
-        <button class="pill pill-draft js-status" data-status="draft">
-            <span>Draft</span><strong>{{ (int)$stats['draft'] }}</strong>
-        </button>
-        <button class="pill pill-submitted js-status" data-status="submitted">
-            <span>Submitted</span><strong>{{ (int)$stats['submitted'] }}</strong>
-        </button>
-        <button class="pill pill-tr8 js-status" data-status="tr8_issued">
-            <span>TR8 Issued</span><strong>{{ (int)$stats['tr8_issued'] }}</strong>
-        </button>
-        <button class="pill pill-arrived js-status" data-status="arrived">
-            <span>Arrived</span><strong>{{ (int)$stats['arrived'] }}</strong>
-        </button>
-        <button class="pill pill-cancelled js-status" data-status="cancelled">
-            <span>Cancelled</span><strong>{{ (int)$stats['cancelled'] }}</strong>
-        </button>
+    {{-- Status pills --}}
+    <div class="c-card c-strip">
+        @foreach($pillStatuses as $p)
+            @php
+                $isActive = (string)$selectedStatus === (string)$p['key'];
+                $toneClass = 'tone-' . ($p['tone'] ?? 'neutral');
+            @endphp
+            <div class="pill {{ $toneClass }} {{ $isActive ? 'active' : '' }}"
+                 onclick="document.getElementById('status').value='{{ $p['key'] }}'; document.getElementById('filtersForm').submit();">
+                <span class="k">{{ $p['label'] }}</span>
+                <span class="v">{{ $p['count'] ?? 0 }}</span>
+            </div>
+        @endforeach
     </div>
 
-    {{-- Attention cards --}}
-    <div class="c-attention">
-        <div class="c-attention-head">
-            <div class="c-attention-title">Needs attention</div>
-            <div class="c-attention-sub">Fast flags (overdue stages, missing TR8/docs). Think “task inbox”.</div>
+    {{-- Attention + Filters --}}
+    <div class="c-grid">
+
+        {{-- Needs attention --}}
+        <div class="c-card c-attn">
+            <h3>Needs attention</h3>
+            <div class="muted" style="margin-bottom:10px;">
+                Fast flags: overdue stages, missing TR8/docs. Treat this like a task inbox.
+            </div>
+
+            <div class="attn-row">
+                <div class="attn">
+                    <div class="t">Stuck in Submitted</div>
+                    <div class="n">{{ $stats['stuck_submitted'] ?? 0 }}</div>
+                    <div class="h">Chase border/agent. Submitted &gt; 24h.</div>
+                </div>
+                <div class="attn">
+                    <div class="t">TR8 issued, not arrived</div>
+                    <div class="n">{{ $stats['stuck_tr8_issued'] ?? 0 }}</div>
+                    <div class="h">Chase truck/dispatch. Issued &gt; 24h.</div>
+                </div>
+                <div class="attn">
+                    <div class="t">Missing TR8 number</div>
+                    <div class="n">{{ $stats['missing_tr8_number'] ?? 0 }}</div>
+                    <div class="h">Data risk (can’t reconcile clearance).</div>
+                </div>
+                <div class="attn">
+                    <div class="t">Missing documents</div>
+                    <div class="n">{{ $stats['missing_documents'] ?? 0 }}</div>
+                    <div class="h">Audit risk (attach invoice/delivery/TR8).</div>
+                </div>
+            </div>
         </div>
 
-        <div class="c-attention-grid">
-            <div class="flag flag-amber">
-                <div class="flag-title">Stuck in Submitted</div>
-                <div class="flag-value">{{ (int)$stats['stuck_submitted'] }}</div>
-                <div class="flag-sub">Chase border/agent</div>
-            </div>
-            <div class="flag flag-blue">
-                <div class="flag-title">TR8 Issued, not arrived</div>
-                <div class="flag-value">{{ (int)$stats['stuck_tr8_issued'] }}</div>
-                <div class="flag-sub">Chase truck/dispatch</div>
-            </div>
-            <div class="flag flag-red">
-                <div class="flag-title">Missing TR8 number</div>
-                <div class="flag-value">{{ (int)$stats['missing_tr8_number'] }}</div>
-                <div class="flag-sub">Data risk</div>
-            </div>
-            <div class="flag flag-red2">
-                <div class="flag-title">Missing documents</div>
-                <div class="flag-value">{{ (int)$stats['missing_docs'] }}</div>
-                <div class="flag-sub">Audit risk</div>
-            </div>
+        {{-- Filters --}}
+        <div class="c-card c-filters">
+            <h3>
+                <span>Filters</span>
+                <span class="c-small">Affects list &amp; exports</span>
+            </h3>
+
+            <form id="filtersForm" method="GET" action="{{ route('depot.compliance.clearances.index') }}">
+                <div class="f-row">
+                    <div class="f">
+                        <label for="client_id">Client</label>
+                        <select id="client_id" name="client_id">
+                            <option value="">All clients</option>
+                            @foreach($clients as $c)
+                                <option value="{{ $c->id }}" @selected((string)$selectedClient === (string)$c->id)>
+                                    {{ $c->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="f">
+                        <label for="status">Status</label>
+                        <select id="status" name="status">
+                            @foreach($statusLabels as $k => $label)
+                                <option value="{{ $k }}" @selected((string)$selectedStatus === (string)$k)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="f">
+                        <label for="q">Search</label>
+                        <input id="q" name="q" value="{{ $search }}" placeholder="Truck, trailer, TR8, invoice, border…" />
+                    </div>
+
+                    <div class="f">
+                        <label for="from">From</label>
+                        <input id="from" name="from" value="{{ $from }}" placeholder="mm/dd/yyyy" />
+                    </div>
+
+                    <div class="f">
+                        <label for="to">To</label>
+                        <input id="to" name="to" value="{{ $to }}" placeholder="mm/dd/yyyy" />
+                    </div>
+                </div>
+
+                <div class="f-actions">
+                    <button class="c-btn c-btn-primary" type="submit">Apply</button>
+                    <a class="c-btn" href="{{ route('depot.compliance.clearances.index') }}">Reset</a>
+                </div>
+            </form>
         </div>
+
     </div>
 
-    {{-- Filters (overhaul) --}}
-    <div class="c-filters">
-        <div class="c-filters-head">
+    {{-- List --}}
+    <div class="c-card c-list">
+        <div class="c-list-head">
             <div>
-                <div class="c-filters-title">Filters</div>
-                <div class="c-filters-sub">Filters affect the list and exports.</div>
+                <h3>Clearances</h3>
+                <p>High density list, fast actions. This is where compliance lives.</p>
             </div>
 
-            <div class="c-filters-actions">
-                <button type="button" class="btn btn-outline-secondary btn-sm c-btn" id="resetFilters">Reset</button>
-                <button type="button" class="btn btn-primary btn-sm c-btn" id="applyFilters">Apply</button>
-            </div>
-        </div>
-
-        <div class="c-filters-body">
-            <div class="f-row">
-                <div class="f-group">
-                    <label class="f-label">Client</label>
-                    <select class="f-control" id="filterClient">
-                        <option value="">All clients</option>
-                        @foreach($clients as $c)
-                            <option value="{{ $c->id }}" @selected((string)request('client_id') === (string)$c->id)>{{ $c->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="f-group">
-                    <label class="f-label">Status</label>
-                    <select class="f-control" id="filterStatus">
-                        <option value="">All</option>
-                        @foreach(['draft','submitted','tr8_issued','arrived','offloaded','cancelled'] as $s)
-                            <option value="{{ $s }}" @selected(request('status') === $s)>{{ strtoupper(str_replace('_',' ', $s)) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="f-group f-grow">
-                    <label class="f-label">Search</label>
-                    <input class="f-control" id="filterQ" value="{{ request('q') }}" placeholder="Truck, trailer, TR8, invoice, border…">
-                </div>
-
-                <div class="f-group">
-                    <label class="f-label">From</label>
-                    <input type="date" class="f-control" id="filterFrom" value="{{ request('from') }}">
-                </div>
-
-                <div class="f-group">
-                    <label class="f-label">To</label>
-                    <input type="date" class="f-control" id="filterTo" value="{{ request('to') }}">
+            <div class="c-list-actions">
+                <div class="c-small">
+                    @if($clearances && method_exists($clearances, 'total'))
+                        Showing {{ $clearances->count() }} of {{ $clearances->total() }}
+                    @else
+                        —
+                    @endif
                 </div>
             </div>
         </div>
-    </div>
 
-    {{-- List header bar (exports moved here + new clearance here too) --}}
-    <div class="c-list-head">
-        <div>
-            <div class="c-list-title">Clearances</div>
-            <div class="c-list-sub">High density list, fast actions. This is where compliance lives.</div>
+        <div style="overflow:auto;border-radius:12px;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Client</th>
+                        <th>Truck</th>
+                        <th>Trailer</th>
+                        <th>Loaded @20°C</th>
+                        <th>TR8</th>
+                        <th>Border</th>
+                        <th>Submitted</th>
+                        <th>Issued</th>
+                        <th>Updated by</th>
+                        <th style="text-align:right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php
+                        $rows = $clearances ? $clearances : collect();
+                    @endphp
+
+                    @forelse($rows as $cl)
+                        @php
+                            $st = $cl->status ?? 'draft';
+                            $dotClass = in_array($st, ['draft','submitted','tr8_issued','arrived','cancelled']) ? $st : 'draft';
+
+                            // These may not exist yet on your model; keep null-safe.
+                            $submittedAt = $cl->submitted_at ?? null;
+                            $issuedAt = $cl->tr8_issued_at ?? null;
+
+                            // Updated by - if you later add relation, swap here.
+                            $updatedBy = $cl->updated_by_name ?? ($cl->updated_by ?? $cl->updated_by_id ?? null);
+                        @endphp
+
+                        <tr>
+                            <td>
+                                <span class="badge">
+                                    <span class="dot {{ $dotClass }}"></span>
+                                    {{ $statusLabels[$st] ?? ucfirst(str_replace('_',' ', $st)) }}
+                                </span>
+                            </td>
+                            <td>{{ $cl->client->name ?? '—' }}</td>
+                            <td class="mono">{{ $cl->truck_number ?? '—' }}</td>
+                            <td class="mono">{{ $cl->trailer_number ?? '—' }}</td>
+                            <td class="mono">
+                                @if(!is_null($cl->loaded_20_l))
+                                    {{ number_format((float)$cl->loaded_20_l, 0) }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td class="mono">{{ $cl->tr8_number ?? '—' }}</td>
+                            <td>{{ $cl->border_point ?? '—' }}</td>
+                            <td class="muted">{{ $submittedAt ? \Carbon\Carbon::parse($submittedAt)->format('n/j/Y') : '—' }}</td>
+                            <td class="muted">{{ $issuedAt ? \Carbon\Carbon::parse($issuedAt)->format('n/j/Y') : '—' }}</td>
+                            <td class="muted">{{ $updatedBy ?? '—' }}</td>
+
+                            <td>
+                                <div class="row-actions">
+                                    <a class="c-btn" href="{{ route('depot.compliance.clearances.show', $cl) }}">Open</a>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="11">
+                                <div class="empty">
+                                    No clearances found for the selected filters.
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
 
-        <div class="c-list-actions">
-            <div class="c-list-count" id="rowsCount">Showing 0</div>
-
-            <button id="export-xlsx" type="button" class="btn btn-outline-secondary btn-sm c-btn">
-                Export Excel
-            </button>
-            <button id="export-pdf" type="button" class="btn btn-outline-secondary btn-sm c-btn">
-                Export PDF
-            </button>
-
-            @if($canCreate)
-                <button class="btn btn-primary btn-sm c-btn" type="button" data-bs-toggle="modal" data-bs-target="#createClearanceModal">
-                    + New Clearance
-                </button>
-            @endif
-        </div>
-    </div>
-
-    {{-- Tabulator --}}
-    <div class="c-table">
-        <div id="clearances-table"></div>
-        <div id="emptyState" class="c-empty d-none">
-            <div class="c-empty-title">No clearances found</div>
-            <div class="c-empty-sub">Change filters or create a clearance.</div>
-            @if($canCreate)
-                <button class="btn btn-primary btn-sm c-btn mt-2" type="button" data-bs-toggle="modal" data-bs-target="#createClearanceModal">
-                    + New Clearance
-                </button>
-            @endif
-        </div>
+        @if($clearances && method_exists($clearances, 'links'))
+            <div style="margin-top:12px;">
+                {{ $clearances->withQueryString()->links() }}
+            </div>
+        @endif
     </div>
 
 </div>
 
-{{-- Create modal (separate blade) --}}
-@include('depot-stock::compliance.clearances._create_modal')
-@endsection
-
-@push('styles')
-<style>
-    .compliance-wrap{max-width:1240px;margin:0 auto}
-
-    /* Header */
-    .c-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
-    .c-title{font-size:22px;font-weight:900;letter-spacing:-.02em}
-    .c-subtitle{color:rgba(0,0,0,.55);font-size:13px;margin-top:4px}
-    .c-head-actions{display:flex;align-items:center;gap:10px}
-    .c-refresh{font-size:12px;color:rgba(0,0,0,.55)}
-
-    /* Strip pills */
-    .c-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-    .pill{border:1px solid rgba(0,0,0,.08);border-radius:999px;background:#fff;padding:10px 12px;display:flex;gap:10px;align-items:center}
-    .pill span{font-size:12px;color:rgba(0,0,0,.55);font-weight:700}
-    .pill strong{font-weight:900}
-    .pill-neutral{background:linear-gradient(135deg, rgba(0,0,0,.03), rgba(0,0,0,0))}
-    .pill-draft{background:linear-gradient(135deg, rgba(108,117,125,.14), rgba(255,255,255,0))}
-    .pill-submitted{background:linear-gradient(135deg, rgba(255,193,7,.18), rgba(255,255,255,0))}
-    .pill-tr8{background:linear-gradient(135deg, rgba(13,202,240,.18), rgba(255,255,255,0))}
-    .pill-arrived{background:linear-gradient(135deg, rgba(13,110,253,.14), rgba(255,255,255,0))}
-    .pill-cancelled{background:linear-gradient(135deg, rgba(220,53,69,.14), rgba(255,255,255,0))}
-    .pill.active{outline:2px solid rgba(13,110,253,.35)}
-
-    /* Attention */
-    .c-attention{border:1px solid rgba(0,0,0,.08);border-radius:16px;background:#fff;padding:14px;margin-bottom:14px}
-    .c-attention-head{display:flex;justify-content:space-between;gap:12px;align-items:end;margin-bottom:12px}
-    .c-attention-title{font-weight:900}
-    .c-attention-sub{font-size:12px;color:rgba(0,0,0,.55)}
-    .c-attention-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-    @media (max-width: 992px){ .c-attention-grid{grid-template-columns:repeat(2,1fr);} }
-    @media (max-width: 520px){ .c-attention-grid{grid-template-columns:1fr;} }
-
-    .flag{border:1px solid rgba(0,0,0,.08);border-radius:14px;padding:12px;min-height:88px}
-    .flag-title{font-size:12px;font-weight:900;color:rgba(0,0,0,.65)}
-    .flag-value{font-size:22px;font-weight:950;margin-top:6px}
-    .flag-sub{font-size:12px;color:rgba(0,0,0,.55)}
-    .flag-amber{background:linear-gradient(135deg, rgba(255,193,7,.18), rgba(255,255,255,0))}
-    .flag-blue{background:linear-gradient(135deg, rgba(13,110,253,.14), rgba(255,255,255,0))}
-    .flag-red{background:linear-gradient(135deg, rgba(220,53,69,.14), rgba(255,255,255,0))}
-    .flag-red2{background:linear-gradient(135deg, rgba(220,53,69,.10), rgba(255,255,255,0))}
-
-    /* Filters */
-    .c-filters{border:1px solid rgba(0,0,0,.08);border-radius:16px;background:#fff;padding:14px;margin-bottom:14px}
-    .c-filters-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
-    .c-filters-title{font-weight:900}
-    .c-filters-sub{font-size:12px;color:rgba(0,0,0,.55)}
-    .c-filters-actions{display:flex;gap:8px}
-
-    .f-row{display:flex;gap:10px;flex-wrap:wrap}
-    .f-group{min-width:160px}
-    .f-grow{flex:1;min-width:260px}
-    .f-label{display:block;font-size:12px;color:rgba(0,0,0,.55);font-weight:800;margin-bottom:6px}
-    .f-control{width:100%;border:1px solid rgba(0,0,0,.16);border-radius:12px;padding:10px 12px;background:#fff;outline:none}
-    .f-control:focus{border-color:rgba(13,110,253,.55);box-shadow:0 0 0 3px rgba(13,110,253,.12)}
-
-    /* List head */
-    .c-list-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:16px 0 10px 0}
-    .c-list-title{font-weight:950;font-size:16px}
-    .c-list-sub{font-size:12px;color:rgba(0,0,0,.55)}
-    .c-list-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .c-list-count{font-size:12px;color:rgba(0,0,0,.55);font-weight:800;padding:6px 10px;border:1px solid rgba(0,0,0,.10);border-radius:999px;background:#fff}
-
-    /* Buttons */
-    .c-btn{border-radius:12px;font-weight:800}
-
-    /* Table shell */
-    .c-table{border:1px solid rgba(0,0,0,.08);border-radius:16px;background:#fff;padding:10px}
-    #clearances-table .tabulator{border:0;border-radius:14px;overflow:hidden}
-    #clearances-table .tabulator-header{border-bottom:1px solid rgba(0,0,0,.06);background:#fff}
-    #clearances-table .tabulator-col-title{font-weight:900;color:rgba(0,0,0,.65);letter-spacing:.04em;font-size:12px}
-    #clearances-table .tabulator-row{border-bottom:1px solid rgba(0,0,0,.04)}
-    #clearances-table .tabulator-row:hover{background:rgba(0,0,0,.02)}
-    #clearances-table .tabulator-cell{padding:12px 10px}
-
-    .status-pill{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:999px;font-size:12px;font-weight:950;border:1px solid rgba(0,0,0,.10)}
-    .sp-draft{background:rgba(108,117,125,.12);color:#495057}
-    .sp-submitted{background:rgba(255,193,7,.18);color:#7a5b00}
-    .sp-tr8_issued{background:rgba(13,202,240,.18);color:#055160}
-    .sp-arrived{background:rgba(13,110,253,.12);color:#084298}
-    .sp-offloaded{background:rgba(25,135,84,.12);color:#0f5132}
-    .sp-cancelled{background:rgba(220,53,69,.12);color:#842029}
-
-    .c-empty{border:1px dashed rgba(0,0,0,.16);border-radius:14px;padding:18px;text-align:center;margin-top:10px}
-    .c-empty-title{font-weight:950}
-    .c-empty-sub{font-size:12px;color:rgba(0,0,0,.55);margin-top:4px}
-
-    .mini{display:inline-flex;gap:8px;align-items:center}
-    .mini a, .mini button{border-radius:12px;font-size:12px;font-weight:900;border:1px solid rgba(0,0,0,.14);padding:.25rem .55rem;background:#fff}
-    .mini a:hover, .mini button:hover{background:rgba(0,0,0,.03)}
-    .mini .danger{border-color:rgba(220,53,69,.35)}
-</style>
-@endpush
+{{-- Create Clearance Modal --}}
+@if($canCreate)
+    @include('depot-stock::compliance.clearances._create_modal')
+@endif
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (!window.Tabulator) return;
+    // Placeholder exports (client-side export wiring will be done when we move list to Tabulator properly)
+    const x = document.getElementById('export-xlsx');
+    const p = document.getElementById('export-pdf');
 
-    const csrf = @json(csrf_token());
-    const canCreate = @json($canCreate);
-
-    const els = {
-        client: document.getElementById('filterClient'),
-        status: document.getElementById('filterStatus'),
-        q: document.getElementById('filterQ'),
-        from: document.getElementById('filterFrom'),
-        to: document.getElementById('filterTo'),
-        apply: document.getElementById('applyFilters'),
-        reset: document.getElementById('resetFilters'),
-        rowsCount: document.getElementById('rowsCount'),
-        refreshed: document.getElementById('last-refreshed'),
-        empty: document.getElementById('emptyState'),
-    };
-
-    function currentParams(){
-        return {
-            client_id: els.client?.value || '',
-            status: els.status?.value || '',
-            q: els.q?.value || '',
-            from: els.from?.value || '',
-            to: els.to?.value || '',
-        };
-    }
-
-    function setStripActive(status){
-        document.querySelectorAll('.js-status').forEach(b => {
-            b.classList.toggle('active', (b.dataset.status || '') === (status || ''));
-        });
-    }
-    setStripActive(els.status?.value || '');
-
-    // Tabulator
-    const tableEl = document.getElementById('clearances-table');
-    const dataUrl = "{{ route('depot.compliance.clearances.data') }}";
-
-    function statusPill(status){
-        const s = (status || '').toString();
-        const label = s ? s.replaceAll('_',' ').toUpperCase() : '—';
-        return `<span class="status-pill sp-${s}">${label}</span>`;
-    }
-
-    function actionButtons(row){
-        const id = row.id;
-        const status = row.status;
-
-        const openUrl = `{{ url('depot/compliance/clearances') }}/${id}`;
-
-        // server routes exist (POST):
-        const submitUrl = `{{ url('depot/compliance/clearances') }}/${id}/submit`;
-        const arriveUrl = `{{ url('depot/compliance/clearances') }}/${id}/arrive`;
-        const cancelUrl = `{{ url('depot/compliance/clearances') }}/${id}/cancel`;
-
-        // Only show actions that make sense for the status
-        let html = `<div class="mini">
-            <a href="${openUrl}">Open</a>
-        `;
-
-        // submit only from draft
-        if (status === 'draft') {
-            html += `
-                <form method="POST" action="${submitUrl}" style="display:inline;">
-                    <input type="hidden" name="_token" value="${csrf}">
-                    <button type="submit">Submit</button>
-                </form>
-            `;
-        }
-
-        // arrive only from tr8_issued
-        if (status === 'tr8_issued') {
-            html += `
-                <form method="POST" action="${arriveUrl}" style="display:inline;">
-                    <input type="hidden" name="_token" value="${csrf}">
-                    <button type="submit">Arrived</button>
-                </form>
-            `;
-        }
-
-        // cancel from anything except cancelled/offloaded
-        if (status !== 'cancelled' && status !== 'offloaded') {
-            html += `
-                <form method="POST" action="${cancelUrl}" style="display:inline;" onsubmit="return confirm('Cancel this clearance?');">
-                    <input type="hidden" name="_token" value="${csrf}">
-                    <button type="submit" class="danger">Cancel</button>
-                </form>
-            `;
-        }
-
-        html += `</div>`;
-        return html;
-    }
-
-    window.clearancesTable = new Tabulator(tableEl, {
-        layout: "fitColumns",
-        height: "560px",
-        movableColumns: true,
-        pagination: true,
-        paginationSize: 20,
-        ajaxURL: dataUrl,
-        ajaxParams: currentParams,
-        placeholder: "Loading…",
-        rowClick: function(e, row){
-            const d = row.getData();
-            window.location.href = `{{ url('depot/compliance/clearances') }}/${d.id}`;
-        },
-        ajaxResponse: function(url, params, resp){
-            const rows = Array.isArray(resp) ? resp : (resp.data || []);
-            if (els.empty) els.empty.classList.toggle('d-none', rows.length !== 0);
-            if (els.rowsCount) els.rowsCount.textContent = `Showing ${rows.length}`;
-            if (els.refreshed) els.refreshed.textContent = `Last refreshed: ${new Date().toLocaleString()}`;
-            return rows;
-        },
-        columns: [
-            {title: "STATUS", field: "status", width: 140, formatter: c => statusPill(c.getValue())},
-            {title: "CLIENT", field: "client_name", minWidth: 190},
-            {title: "TRUCK", field: "truck_number", minWidth: 130},
-            {title: "TRAILER", field: "trailer_number", minWidth: 130},
-            {title: "LOADED @20°C", field: "loaded_20_l", hozAlign:"right", minWidth: 140, formatter:"money", formatterParams:{precision: 3}},
-            {title: "TR8", field: "tr8_number", minWidth: 120},
-            {title: "BORDER", field: "border_point", minWidth: 120},
-            {title: "SUBMITTED", field: "submitted_at", minWidth: 160},
-            {title: "ISSUED", field: "tr8_issued_at", minWidth: 160},
-            {title: "UPDATED BY", field: "updated_by_name", minWidth: 160},
-            {title: "AGE", field: "age_human", minWidth: 110},
-            {title: "ACTION", field: "id", width: 260, headerSort:false, formatter: (cell) => actionButtons(cell.getRow().getData())},
-        ],
-    });
-
-    // Apply / Reset
-    function reload(){
-        window.clearancesTable.setData(dataUrl, currentParams());
-        setStripActive(els.status?.value || '');
-        // update URL (nice UX)
-        const p = currentParams();
-        const qs = new URLSearchParams();
-        Object.keys(p).forEach(k => { if (p[k]) qs.set(k, p[k]); });
-        const newUrl = `${window.location.pathname}${qs.toString() ? ('?' + qs.toString()) : ''}`;
-        window.history.replaceState({}, '', newUrl);
-    }
-
-    els.apply?.addEventListener('click', reload);
-
-    els.reset?.addEventListener('click', function(){
-        if (els.client) els.client.value = '';
-        if (els.status) els.status.value = '';
-        if (els.q) els.q.value = '';
-        if (els.from) els.from.value = '';
-        if (els.to) els.to.value = '';
-        reload();
-    });
-
-    // status strip -> sets status filter and reloads
-    document.querySelectorAll('.js-status').forEach(btn => {
-        btn.addEventListener('click', function(){
-            if (els.status) els.status.value = (btn.dataset.status || '');
-            reload();
-        });
-    });
-
-    // live search debounce
-    let t = null;
-    els.q?.addEventListener('input', function(){
-        clearTimeout(t);
-        t = setTimeout(reload, 350);
-    });
-
-    // exports (client-side only)
-    document.getElementById('export-xlsx')?.addEventListener('click', function(){
-        window.clearancesTable.download("xlsx", "compliance_clearances.xlsx");
-    });
-
-    document.getElementById('export-pdf')?.addEventListener('click', function(){
-        window.clearancesTable.download("pdf", "compliance_clearances.pdf", {
-            orientation: "landscape",
-            title: "Compliance Clearances",
-        });
-    });
-
+    if (x) x.addEventListener('click', () => alert('Export Excel: wired when list is Tabulator (client-side).'));
+    if (p) p.addEventListener('click', () => alert('Export PDF: wired when list is Tabulator (client-side).'));
 });
 </script>
 @endpush
+
+@endsection
