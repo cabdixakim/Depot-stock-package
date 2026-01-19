@@ -113,7 +113,7 @@
                             {{-- Attention popover --}}
                             <div
                                 id="attentionPanel"
-                                class="hidden absolute right-0 mt-2 w-[30rem] sm:w-[34rem] rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden z-40"
+                                class="hidden absolute right-0 mt-2 w-[44rem] sm:w-[34rem] rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden z-40"
                             >
                                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                                     <div class="text-sm font-semibold text-gray-900">Needs attention</div>
