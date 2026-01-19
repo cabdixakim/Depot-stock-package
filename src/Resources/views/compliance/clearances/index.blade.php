@@ -439,123 +439,172 @@
 
 @push('scripts')
 <script>
-document.addEventListener("DOMContentLoaded", function(){
-    // --- Guards
+document.addEventListener("DOMContentLoaded", function () {
+    // -----------------------------
+    // Guard: Tabulator must exist
+    // -----------------------------
     if (!window.Tabulator) {
         console.error("Tabulator missing on window. Ensure it is loaded in Vite app.js and @stack('scripts') exists in layout.");
         return;
     }
 
-    const csrf = @json(csrf_token());
-    const canAct = @json($canAct);
+    const csrf    = @json(csrf_token());
+    const canAct  = @json($canAct ?? false);
     const baseUrl = @json(url('depot/compliance/clearances'));
     const dataUrl = @json(route('depot.compliance.clearances.data'));
 
-    // --- Modal helpers (close on backdrop / esc)
-    const openFlex = (id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.classList.remove('hidden');
-        el.classList.add('flex');
-    };
-    const closeModal = (id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.classList.add('hidden');
-        el.classList.remove('flex');
-    };
-
-    // Close outside modals + close buttons
-    document.addEventListener('click', (e) => {
-        const bd = e.target.closest('[data-modal-backdrop]');
-        if (bd) {
-            const which = bd.getAttribute('data-modal-backdrop');
-            if (which === 'confirm') closeModal('confirmModal');
-            return;
-        }
-        const cl = e.target.closest('[data-modal-close]');
-        if (cl) {
-            const which = cl.getAttribute('data-modal-close');
-            if (which === 'confirm') closeModal('confirmModal');
-        }
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
-        closeModal('confirmModal');
-
-        // create modal id from include
-        const cm = document.getElementById('createClearanceModal');
-        if (cm && !cm.classList.contains('hidden')) closeModal('createClearanceModal');
-
-        closeAttention();
-    });
-
-    // --- Confirm modal API
-    let confirmResolver = null;
-    function confirmUI({title="Confirm", text="Are you sure?"}){
-        document.getElementById('confirmTitle').textContent = title;
-        document.getElementById('confirmText').textContent = text;
-        openFlex('confirmModal');
-        return new Promise((resolve) => { confirmResolver = resolve; });
-    }
-    document.getElementById('confirmOk').addEventListener('click', () => {
-        closeModal('confirmModal');
-        if (confirmResolver) { confirmResolver(true); confirmResolver = null; }
-    });
-    document.querySelectorAll('[data-modal-close="confirm"]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            closeModal('confirmModal');
-            if (confirmResolver) { confirmResolver(false); confirmResolver = null; }
-        });
-    });
-
-    // --- Attention panel toggle (fixed + close on outside)
-    const attBtn = document.getElementById("btnAttention");
-    const attPanel = document.getElementById("attentionPanel");
-    const attWrap = document.getElementById("attWrap");
-
-    function closeAttention(){
-        if (!attPanel) return;
-        attPanel.classList.add("hidden");
-        attBtn?.setAttribute("aria-expanded","false");
-    }
-    function openAttention(){
-        if (!attPanel) return;
-        attPanel.classList.remove("hidden");
-        attBtn?.setAttribute("aria-expanded","true");
-    }
-
-    attBtn?.addEventListener("click", function(){
-        if (!attPanel) return;
-        const isOpen = !attPanel.classList.contains("hidden");
-        isOpen ? closeAttention() : openAttention();
-    });
-
-    document.addEventListener("click", function(e){
-        if (!attWrap || !attPanel) return;
-        if (e.target.closest("[data-att-close]")) { closeAttention(); return; }
-        if (!attWrap.contains(e.target) && !attPanel.contains(e.target)) closeAttention();
-    });
-
-    // --- URL builders
+    // -----------------------------
+    // Helpers: URLs (never depend on row.urls)
+    // -----------------------------
     const showUrl   = (id) => `${baseUrl}/${id}`;
     const submitUrl = (id) => `${baseUrl}/${id}/submit`;
     const issueUrl  = (id) => `${baseUrl}/${id}/issue-tr8`;
     const arriveUrl = (id) => `${baseUrl}/${id}/arrive`;
     const cancelUrl = (id) => `${baseUrl}/${id}/cancel`;
 
-    // --- POST helper
-    async function postJson(url, payload={}){
+    // -----------------------------
+    // Helpers: simple modal open/close
+    // (Create + Issue TR8)
+    // -----------------------------
+    const openModal = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove("hidden");
+        el.classList.add("flex");
+    };
+
+    const closeModal = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add("hidden");
+        el.classList.remove("flex");
+    };
+
+    // Close on backdrop + close buttons (your modals use data-close-modal)
+    document.addEventListener("click", (e) => {
+        const closer = e.target.closest("[data-close-modal]");
+        if (!closer) return;
+
+        const val = closer.getAttribute("data-close-modal");
+
+        // create modal uses "1"
+        if (val === "1") closeModal("createClearanceModal");
+
+        // issue tr8 modal uses "issue_tr8"
+        if (val === "issue_tr8") closeModal("issueTr8Modal");
+    });
+
+    // Esc closes both modals + attention panel
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        closeModal("createClearanceModal");
+        closeModal("issueTr8Modal");
+        closeAttention();
+    });
+
+    // Open Create modal
+    document.getElementById("btnOpenCreateClearance")?.addEventListener("click", () => {
+        openModal("createClearanceModal");
+    });
+
+    // -----------------------------
+    // Issue TR8 modal wiring
+    // - Open from Tabulator action button
+    // - Set form action dynamically
+    // - Save button submits the form (multipart)
+    // -----------------------------
+    const issueTr8Form   = document.getElementById("issueTr8Form");
+    const issueTr8Submit = document.getElementById("issueTr8Submit");
+    const issueTr8Action = document.getElementById("issueTr8Action");
+
+    function openIssueTr8Modal(clearanceId) {
+        if (!issueTr8Form) return;
+        const action = issueUrl(clearanceId);
+        issueTr8Form.setAttribute("action", action);
+        if (issueTr8Action) issueTr8Action.value = action;
+
+        // clear fields for a clean UX
+        document.getElementById("issueTr8Number")?.value && (document.getElementById("issueTr8Number").value = "");
+        const ref = document.getElementById("issueTr8Reference");
+        if (ref) ref.value = "";
+        const doc = document.getElementById("issueTr8Document");
+        if (doc) doc.value = "";
+
+        openModal("issueTr8Modal");
+        setTimeout(() => document.getElementById("issueTr8Number")?.focus(), 50);
+    }
+
+    issueTr8Submit?.addEventListener("click", () => {
+        if (!issueTr8Form) return;
+        // native submit so file upload works
+        issueTr8Form.submit();
+    });
+
+    // -----------------------------
+    // Needs attention panel (keep as-is)
+    // -----------------------------
+    const attBtn   = document.getElementById("btnAttention");
+    const attPanel = document.getElementById("attentionPanel");
+    const attWrap  = document.getElementById("attWrap");
+
+    function closeAttention() {
+        if (!attPanel) return;
+        attPanel.classList.add("hidden");
+        attBtn?.setAttribute("aria-expanded", "false");
+    }
+
+    function openAttention() {
+        if (!attPanel) return;
+        attPanel.classList.remove("hidden");
+        attBtn?.setAttribute("aria-expanded", "true");
+
+        // Keep panel in viewport
+        const rect = attPanel.getBoundingClientRect();
+        const pad = 8;
+
+        // If overflowing left, pin it
+        if (rect.left < pad) {
+            attPanel.style.left = "0.5rem";
+            attPanel.style.right = "auto";
+        } else {
+            attPanel.style.left = "";
+            attPanel.style.right = "0";
+        }
+
+        // If overflowing right, also pin left
+        const rect2 = attPanel.getBoundingClientRect();
+        if (rect2.right > (window.innerWidth - pad)) {
+            attPanel.style.left = "0.5rem";
+            attPanel.style.right = "auto";
+        }
+    }
+
+    attBtn?.addEventListener("click", () => {
+        if (!attPanel) return;
+        const isOpen = !attPanel.classList.contains("hidden");
+        isOpen ? closeAttention() : openAttention();
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!attWrap || !attPanel) return;
+        if (e.target.closest("[data-att-close]")) { closeAttention(); return; }
+        if (!attWrap.contains(e.target)) closeAttention();
+    });
+
+    // -----------------------------
+    // POST helper (JSON) for actions
+    // -----------------------------
+    async function postJson(url, payload = {}) {
         const res = await fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "X-CSRF-TOKEN": csrf
+                "X-CSRF-TOKEN": csrf,
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
         });
+
         if (!res.ok) {
             const text = await res.text();
             throw new Error(text || "Request failed");
@@ -563,20 +612,67 @@ document.addEventListener("DOMContentLoaded", function(){
         return true;
     }
 
-    // --- Tabulator (REMOTE pagination)
+    // -----------------------------
+    // Confirm modal (assumes #confirmModal exists)
+    // -----------------------------
+    let confirmResolver = null;
+
+    const confirmModal  = document.getElementById("confirmModal");
+    const confirmTitle  = document.getElementById("confirmTitle");
+    const confirmText   = document.getElementById("confirmText");
+    const confirmOk     = document.getElementById("confirmOk");
+
+    function openConfirm({ title = "Confirm", text = "Are you sure?" } = {}) {
+        if (!confirmModal) return Promise.resolve(false);
+        if (confirmTitle) confirmTitle.textContent = title;
+        if (confirmText)  confirmText.textContent  = text;
+        confirmModal.classList.remove("hidden");
+        confirmModal.classList.add("flex");
+        return new Promise((resolve) => (confirmResolver = resolve));
+    }
+
+    function closeConfirm(result) {
+        if (!confirmModal) return;
+        confirmModal.classList.add("hidden");
+        confirmModal.classList.remove("flex");
+        if (confirmResolver) { confirmResolver(result); confirmResolver = null; }
+    }
+
+    confirmOk?.addEventListener("click", () => closeConfirm(true));
+
+    // close confirm on backdrop + cancel buttons
+    document.addEventListener("click", (e) => {
+        if (e.target.closest('[data-modal-close="confirm"]')) closeConfirm(false);
+        if (e.target.closest('[data-modal-backdrop="confirm"]')) closeConfirm(false);
+    });
+
+    // -----------------------------
+    // Tabulator: remote pagination + stable response shaping
+    // -----------------------------
+    const rowToneClass = (status) => {
+        switch ((status || "").toString()) {
+            case "submitted":  return "row-submitted";
+            case "tr8_issued": return "row-tr8";
+            case "arrived":    return "row-arrived";
+            case "cancelled":  return "row-cancelled";
+            default:           return "row-draft";
+        }
+    };
+
     const table = new Tabulator("#clearancesTable", {
         layout: "fitColumns",
-        responsiveLayout: "collapse",
+        responsiveLayout: false,              // IMPORTANT: prevents “stacking under rows”
         height: "560px",
         placeholder: "No clearances found for this filter.",
         pagination: true,
         paginationMode: "remote",
         paginationSize: 20,
+
         ajaxURL: dataUrl,
         ajaxParams: () => Object.fromEntries(new URLSearchParams(window.location.search).entries()),
 
-        // controller returns: {data: [...], meta:{...}}
-        ajaxResponse: function(url, params, resp){
+        ajaxResponse: function (url, params, resp) {
+            // Controller returns: {data: [...], meta:{...}}
             return {
                 data: Array.isArray(resp?.data) ? resp.data : [],
                 current_page: resp?.meta?.current_page ?? 1,
@@ -585,28 +681,25 @@ document.addEventListener("DOMContentLoaded", function(){
                 total: resp?.meta?.total ?? (Array.isArray(resp?.data) ? resp.data.length : 0),
             };
         },
+
         paginationDataReceived: {
-            "last_page":"last_page",
-            "data":"data",
-            "current_page":"current_page",
-            "total":"total"
+            last_page: "last_page",
+            data: "data",
+            current_page: "current_page",
+            total: "total",
         },
 
-        rowClick: function(e, row){
+        rowFormatter: function (row) {
+            const el = row.getElement();
+            const s  = row.getData().status;
+            el.classList.add(rowToneClass(s));
+        },
+
+        rowClick: function (e, row) {
+            // Don’t navigate if clicking a button
             if (e.target.closest("button")) return;
             const id = row.getData().id;
             if (id) window.location.href = showUrl(id);
-        },
-
-        rowFormatter: function(row){
-            const s = (row.getData().status || "").toString();
-            const el = row.getElement();
-            el.classList.remove("bg-gray-50","bg-amber-50","bg-blue-50","bg-emerald-50","bg-rose-50");
-            if (s === "draft") el.classList.add("bg-gray-50");
-            if (s === "submitted") el.classList.add("bg-amber-50");
-            if (s === "tr8_issued") el.classList.add("bg-blue-50");
-            if (s === "arrived") el.classList.add("bg-emerald-50");
-            if (s === "cancelled") el.classList.add("bg-rose-50");
         },
 
         columns: [
@@ -616,69 +709,88 @@ document.addEventListener("DOMContentLoaded", function(){
                 width: 150,
                 formatter: (cell) => {
                     const s = (cell.getValue() || "").toString();
-                    const label = s.replaceAll("_"," ").toUpperCase();
+                    const label = s.replaceAll("_", " ").toUpperCase();
                     const cls = ({
-                        draft: "border-gray-200 bg-white/60 text-gray-900",
-                        submitted: "border-amber-200 bg-white/60 text-amber-900",
-                        tr8_issued: "border-blue-200 bg-white/60 text-blue-900",
-                        arrived: "border-emerald-200 bg-white/60 text-emerald-900",
-                        cancelled: "border-rose-200 bg-white/60 text-rose-900",
-                    })[s] || "border-gray-200 bg-white/60 text-gray-900";
-                    return `<span class="inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${cls}">${label || '-'}</span>`;
-                }
+                        draft: "border-gray-200 bg-gray-50 text-gray-900",
+                        submitted: "border-amber-200 bg-amber-50 text-amber-900",
+                        tr8_issued: "border-blue-200 bg-blue-50 text-blue-900",
+                        arrived: "border-emerald-200 bg-emerald-50 text-emerald-900",
+                        cancelled: "border-rose-200 bg-rose-50 text-rose-900",
+                    })[s] || "border-gray-200 bg-gray-50 text-gray-900";
+
+                    return `<span class="inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-semibold ${cls}">${label || "-"}</span>`;
+                },
             },
             { title: "CLIENT", field: "client_name", minWidth: 180 },
-            { title: "TRUCK", field: "truck_number", width: 140 },
-            { title: "TRAILER", field: "trailer_number", width: 150 },
+            { title: "TRUCK", field: "truck_number", width: 130 },
+            { title: "TRAILER", field: "trailer_number", width: 140 },
+            { title: "LOADED @20°C", field: "loaded_20_l", hozAlign: "right", width: 150 },
             { title: "TR8", field: "tr8_number", width: 140 },
             { title: "BORDER", field: "border_point", width: 150 },
+            { title: "SUBMITTED", field: "submitted_at", width: 165 },
+            { title: "ISSUED", field: "tr8_issued_at", width: 165 },
+
+            // Keep these as REAL columns (not stacked)
             { title: "UPDATED BY", field: "updated_by_name", width: 170 },
             { title: "AGE", field: "age_human", width: 120 },
+
             {
                 title: "ACTIONS",
                 field: "id",
                 headerSort: false,
-                minWidth: 320,
+                width: 320,
                 formatter: (cell) => {
-                    const data = cell.getRow().getData();
-                    const id = data.id;
-                    const s  = data.status;
-
-                    const btn = (label, action, tone="gray") => {
-                        const toneClass = ({
-                            dark: "border-gray-900 bg-gray-900 text-white hover:bg-gray-800",
-                            amber:"border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
-                            rose: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
-                            emerald:"border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
-                        })[tone] || "border-gray-200 bg-white/70 hover:bg-white text-gray-800";
-
-                        return `<button type="button" class="px-3 py-1.5 rounded-xl border text-xs font-semibold ${toneClass}" data-action="${action}" data-id="${id}">${label}</button>`;
-                    };
+                    const d = cell.getRow().getData();
+                    const id = d.id;
+                    const s = d.status;
 
                     if (!canAct) return `<span class="text-xs text-gray-400">—</span>`;
 
-                    let html = `<div class="flex flex-nowrap items-center gap-2">`;
-                    if (s === 'draft') html += btn("Submit", "submit", "dark");
-                    if (s === 'submitted') {
+                    const btn = (label, action, tone = "gray") => {
+                        const toneClass = ({
+                            gray: "border-gray-200 bg-white text-gray-800 hover:bg-gray-50",
+                            dark: "border-gray-900 bg-gray-900 text-white hover:bg-gray-800",
+                            amber: "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
+                            blue: "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
+                            rose: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
+                            emerald: "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+                        })[tone] || "border-gray-200 bg-white text-gray-800 hover:bg-gray-50";
+
+                        return `<button type="button"
+                                    class="px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold whitespace-nowrap ${toneClass}"
+                                    data-action="${action}" data-id="${id}"
+                                >${label}</button>`;
+                    };
+
+                    // single-line actions, no wrap
+                    let html = `<div class="inline-flex items-center gap-2 whitespace-nowrap">`;
+
+                    if (s === "draft") {
+                        html += btn("Submit", "submit", "dark");
+                    }
+                    if (s === "submitted") {
                         html += btn("Issue TR8", "issue", "amber");
                         html += btn("Cancel", "cancel", "rose");
                     }
-                    if (s === 'tr8_issued') {
+                    if (s === "tr8_issued") {
                         html += btn("Arrived", "arrive", "emerald");
                         html += btn("Cancel", "cancel", "rose");
                     }
-                    if (s === 'arrived') {
+                    if (s === "arrived") {
                         html += btn("Cancel", "cancel", "rose");
                     }
+
                     html += `</div>`;
                     return html;
-                }
+                },
             },
         ],
     });
 
-    // --- Action handler (confirm modal)
-    document.addEventListener("click", async function(e){
+    // -----------------------------
+    // Action buttons inside table
+    // -----------------------------
+    document.addEventListener("click", async function (e) {
         const btn = e.target.closest("button[data-action][data-id]");
         if (!btn) return;
 
@@ -687,60 +799,67 @@ document.addEventListener("DOMContentLoaded", function(){
 
         try {
             if (action === "submit") {
-                const ok = await confirmUI({title:"Submit clearance", text:"Submit this clearance now?"});
+                const ok = await openConfirm({ title: "Submit clearance", text: "Submit this clearance now?" });
                 if (!ok) return;
                 await postJson(submitUrl(id));
-                table.replaceData();
+                window.location.reload();
             }
 
             if (action === "arrive") {
-                const ok = await confirmUI({title:"Mark arrived", text:"Mark this clearance as arrived?"});
+                const ok = await openConfirm({ title: "Mark arrived", text: "Mark this clearance as arrived?" });
                 if (!ok) return;
                 await postJson(arriveUrl(id));
-                table.replaceData();
+                window.location.reload();
             }
 
             if (action === "cancel") {
-                const ok = await confirmUI({title:"Cancel clearance", text:"Cancel this clearance?"});
+                const ok = await openConfirm({ title: "Cancel clearance", text: "Cancel this clearance? This is a workflow action." });
                 if (!ok) return;
                 await postJson(cancelUrl(id));
-                table.replaceData();
+                window.location.reload();
             }
 
             if (action === "issue") {
-                // v1: prompt (later: modal + file upload)
-                const tr8 = prompt("Enter TR8 number:");
-                if (!tr8) return;
-                await postJson(issueUrl(id), { tr8_number: tr8 });
-                table.replaceData();
+                // Open the real modal (multipart)
+                openIssueTr8Modal(id);
             }
-        } catch(err) {
-            alert(("Action failed:\n\n" + (err?.message || err)).slice(0, 500));
+        } catch (err) {
+            alert(("Action failed:\n\n" + (err?.message || err)).slice(0, 600));
             console.error(err);
         }
     });
 
-    // --- Exports
+    // -----------------------------
+    // Exports (client-side)
+    // NOTE: Remote pagination exports current loaded page.
+    // -----------------------------
     document.getElementById("btnExportXlsx")?.addEventListener("click", () => {
-        table.download("xlsx", "clearances.xlsx", {sheetName:"Clearances"});
+        table.download("xlsx", "clearances.xlsx", { sheetName: "Clearances" });
     });
+
     document.getElementById("btnExportPdf")?.addEventListener("click", () => {
-        table.download("pdf", "clearances.pdf", {orientation:"landscape", title:"Clearances"});
+        table.download("pdf", "clearances.pdf", { orientation: "landscape", title: "Clearances" });
     });
 
-    // --- Create modal open
-    document.getElementById("btnOpenCreateClearance")?.addEventListener("click", () => {
-        const modal = document.getElementById("createClearanceModal");
-        if (!modal) return;
-        modal.classList.remove("hidden");
-        modal.classList.add("flex");
-    });
-
-    // --- Smooth scroll when coming from attention links
+    // -----------------------------
+    // Attention links: smooth scroll
+    // -----------------------------
     if (window.location.hash === "#clearances") {
         const el = document.getElementById("clearances");
-        if (el) el.scrollIntoView({behavior:"smooth", block:"start"});
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 });
 </script>
+
+<style>
+/* Row tinting by status (subtle) */
+#clearancesTable .tabulator-row.row-draft     { background: rgba(148, 163, 184, 0.06); } /* slate tint */
+#clearancesTable .tabulator-row.row-submitted { background: rgba(245, 158, 11, 0.08); } /* amber */
+#clearancesTable .tabulator-row.row-tr8       { background: rgba(59, 130, 246, 0.07); } /* blue */
+#clearancesTable .tabulator-row.row-arrived   { background: rgba(16, 185, 129, 0.08); } /* emerald */
+#clearancesTable .tabulator-row.row-cancelled { background: rgba(244, 63, 94, 0.07); }  /* rose */
+
+/* Keep hover readable on tinted rows */
+#clearancesTable .tabulator-row:hover { filter: brightness(0.98); }
+</style>
 @endpush
