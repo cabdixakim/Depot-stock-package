@@ -8,7 +8,7 @@
         'stuck_submitted' => 0, 'stuck_tr8_issued' => 0, 'missing_tr8_number' => 0, 'missing_docs' => 0,
     ];
 
-    $canCreate = auth()->user()->hasRole('admin|compliance');
+    $canCreate = auth()->user()->hasRole('owner|admin|compliance');
 @endphp
 
 <div class="compliance-wrap">
