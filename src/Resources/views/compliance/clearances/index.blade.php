@@ -401,7 +401,7 @@
 </style>
 @endpush
 
-@push('scripts')
+@@push('scripts')
 <script>
 document.addEventListener("DOMContentLoaded", function(){
     if (!window.Tabulator) {
@@ -409,10 +409,11 @@ document.addEventListener("DOMContentLoaded", function(){
         return;
     }
 
-    const canAct = @json($canAct);
+    const canAct  = @json($canAct);
     const dataUrl = @json(route('depot.compliance.clearances.data'));
+    const csrf    = @json(csrf_token());
 
-    // Modal helpers
+    // ---------- helpers ----------
     const openModal = (id) => {
         const m = document.getElementById(id);
         if (!m) return;
@@ -459,17 +460,15 @@ document.addEventListener("DOMContentLoaded", function(){
         if (!attWrap.contains(e.target)) closeAttention();
     });
 
-    // Smooth scroll when using attention links
     if (window.location.hash === "#clearances") {
         document.getElementById("clearances")?.scrollIntoView({behavior:"smooth", block:"start"});
     }
 
-    // Confirm modal plumbing
+    // Confirm modal plumbing (if present)
     const confirmModalId = "confirmActionModal";
     const confirmTitle = document.getElementById("confirmActionTitle");
     const confirmText = document.getElementById("confirmActionText");
     const confirmBtn = document.getElementById("confirmActionBtn");
-
     let pendingAction = null;
 
     const askConfirm = (opts) => {
@@ -480,7 +479,15 @@ document.addEventListener("DOMContentLoaded", function(){
         openModal(confirmModalId);
     };
 
-    // Issue TR8 modal plumbing
+    confirmBtn?.addEventListener("click", function(){
+        if (!pendingAction) return;
+        const fn = pendingAction.onConfirm;
+        closeModal(confirmModalId);
+        pendingAction = null;
+        if (typeof fn === "function") fn();
+    });
+
+    // Issue TR8 modal plumbing (if present)
     const tr8ModalId = "issueTr8Modal";
     const tr8Form = document.getElementById("issueTr8Form");
     const tr8Number = document.getElementById("issueTr8Number");
@@ -491,21 +498,32 @@ document.addEventListener("DOMContentLoaded", function(){
     const openIssueTr8 = (row) => {
         if (!tr8Form || !tr8Action) return;
         tr8Form.reset();
-        tr8Action.value = row.urls.issue_tr8 || "";
+        tr8Action.value = row?.urls?.issue_tr8 || "";
         if (tr8Number) tr8Number.value = row.tr8_number || "";
         if (tr8Ref) tr8Ref.value = row.tr8_reference || "";
         if (tr8File) tr8File.value = "";
         openModal(tr8ModalId);
     };
 
-    // Tabulator instance
+    document.getElementById("issueTr8Submit")?.addEventListener("click", function(){
+        if (!tr8Form || !tr8Action || !tr8Action.value) return;
+        tr8Form.action = tr8Action.value;
+        tr8Form.submit();
+    });
+
+    document.addEventListener("click", function(e){
+        if (e.target.closest("[data-close-modal='confirm']")) closeModal(confirmModalId);
+        if (e.target.closest("[data-close-modal='issue_tr8']")) closeModal(tr8ModalId);
+    });
+
+    // ---------- table ----------
     const statusPillClass = (status) => {
         switch(status){
-            case "submitted": return "border-amber-200 bg-amber-50 text-amber-900";
+            case "submitted":  return "border-amber-200 bg-amber-50 text-amber-900";
             case "tr8_issued": return "border-blue-200 bg-blue-50 text-blue-900";
-            case "arrived": return "border-emerald-200 bg-emerald-50 text-emerald-900";
-            case "cancelled": return "border-rose-200 bg-rose-50 text-rose-900";
-            default: return "border-gray-200 bg-gray-50 text-gray-900";
+            case "arrived":    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+            case "cancelled":  return "border-rose-200 bg-rose-50 text-rose-900";
+            default:           return "border-gray-200 bg-gray-50 text-gray-900";
         }
     };
 
@@ -513,9 +531,8 @@ document.addEventListener("DOMContentLoaded", function(){
         if (!canAct) return "";
         const s = row.status;
 
-        const btn = (label, action, cls) => {
-            return `<button type="button" class="tbl-btn ${cls}" data-action="${action}">${label}</button>`;
-        };
+        const btn = (label, action, cls) =>
+            `<button type="button" class="tbl-btn ${cls}" data-action="${action}">${label}</button>`;
 
         let html = `<div class="flex flex-wrap items-center gap-2">`;
 
@@ -535,23 +552,42 @@ document.addEventListener("DOMContentLoaded", function(){
         return html;
     };
 
+    const showBase = @json(url('depot/compliance/clearances'));
+
     const table = new Tabulator("#clearancesTable", {
         layout: "fitColumns",
         height: "520px",
         rowHeight: 52,
         placeholder: "No clearances found for the current filters.",
+
         pagination: true,
         paginationMode: "remote",
         paginationSize: 20,
+
         ajaxURL: dataUrl,
+        ajaxConfig: { method: "GET" },
+
         ajaxParams: function () {
             const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
             return params;
         },
-        ajaxResponse: function(url, params, response){
-            if (Array.isArray(response)) return response;
-            return response.data || [];
+
+        // ✅ map your controller meta -> Tabulator remote pagination expectations
+        paginationDataReceived: {
+            last_page: "meta.last_page",
+            data: "data",
+            current_page: "meta.current_page",
+            per_page: "meta.per_page",
+            total: "meta.total",
         },
+
+        ajaxResponse: function(url, params, response){
+            console.log("Tabulator response:", response);
+            // Ensure we always return array for rows
+            if (Array.isArray(response)) return response;
+            return response?.data || [];
+        },
+
         rowFormatter: function(row){
             const data = row.getData();
             const el = row.getElement();
@@ -560,6 +596,7 @@ document.addEventListener("DOMContentLoaded", function(){
             const s = (data.status || "draft").toString();
             el.classList.add("accent-" + s);
         },
+
         columns: [
             {
                 title: "STATUS",
@@ -599,27 +636,24 @@ document.addEventListener("DOMContentLoaded", function(){
                 formatter: (cell) => actionHtml(cell.getRow().getData())
             },
         ],
+
         rowClick: function(e, row){
             const t = e.target;
             if (t.closest("button") || t.closest("a")) return;
             const data = row.getData();
-            if (data && data.id) {
-                const showBase = @json(url('depot/compliance/clearances'));
-                window.location.href = showBase + "/" + data.id;
-            }
-        }
+            if (data?.id) window.location.href = showBase + "/" + data.id;
+        },
     });
 
-    // Exports (client-side) - exports current filtered view (remote pages: exports current loaded set)
+    // Exports (current loaded view)
     document.getElementById("btnExportXlsx")?.addEventListener("click", function(){
         table.download("xlsx", "clearances.xlsx", {sheetName:"Clearances"});
     });
-
     document.getElementById("btnExportPdf")?.addEventListener("click", function(){
         table.download("pdf", "clearances.pdf", { orientation: "landscape", title: "Clearances" });
     });
 
-    // Handle action buttons (modals)
+    // Action handling with modals
     document.addEventListener("click", function(e){
         const btn = e.target.closest("button[data-action]");
         if (!btn) return;
@@ -629,7 +663,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
         const row = table.getRow(rowEl);
         const data = row ? row.getData() : null;
-        if (!data || !data.urls) return;
+        if (!data) return;
 
         const action = btn.getAttribute("data-action");
 
@@ -638,74 +672,47 @@ document.addEventListener("DOMContentLoaded", function(){
             return;
         }
 
-        const actionMap = {
-            submit: {
+        const postForm = (url) => {
+            const f = document.createElement("form");
+            f.method = "POST";
+            f.action = url;
+
+            const csrfInput = document.createElement("input");
+            csrfInput.type = "hidden";
+            csrfInput.name = "_token";
+            csrfInput.value = csrf;
+            f.appendChild(csrfInput);
+
+            document.body.appendChild(f);
+            f.submit();
+        };
+
+        if (action === "submit") {
+            askConfirm({
                 title: "Submit clearance",
                 text: "This will move the clearance to Submitted.",
                 confirmLabel: "Submit",
-                url: data.urls.submit
-            },
-            arrive: {
+                onConfirm: () => postForm(data.urls.submit),
+            });
+        }
+
+        if (action === "arrive") {
+            askConfirm({
                 title: "Mark arrived",
                 text: "This will mark the truck as Arrived.",
                 confirmLabel: "Mark arrived",
-                url: data.urls.arrive
-            },
-            cancel: {
+                onConfirm: () => postForm(data.urls.arrive),
+            });
+        }
+
+        if (action === "cancel") {
+            askConfirm({
                 title: "Cancel clearance",
                 text: "This will cancel the clearance. Continue?",
                 confirmLabel: "Cancel",
-                url: data.urls.cancel
-            }
-        };
-
-        const opts = actionMap[action];
-        if (!opts) return;
-
-        askConfirm({
-            title: opts.title,
-            text: opts.text,
-            confirmLabel: opts.confirmLabel,
-            onConfirm: async function(){
-                // POST via hidden form to keep it stable
-                const f = document.createElement("form");
-                f.method = "POST";
-                f.action = opts.url;
-
-                const csrf = document.createElement("input");
-                csrf.type = "hidden";
-                csrf.name = "_token";
-                csrf.value = @json(csrf_token());
-                f.appendChild(csrf);
-
-                document.body.appendChild(f);
-                f.submit();
-            }
-        });
-    });
-
-    // Confirm modal confirm button
-    confirmBtn?.addEventListener("click", function(){
-        if (!pendingAction) return;
-        const fn = pendingAction.onConfirm;
-        closeModal(confirmModalId);
-        pendingAction = null;
-        if (typeof fn === "function") fn();
-    });
-
-    // Close buttons for modals
-    document.addEventListener("click", function(e){
-        if (e.target.closest("[data-close-modal='confirm']")) closeModal(confirmModalId);
-        if (e.target.closest("[data-close-modal='issue_tr8']")) closeModal(tr8ModalId);
-    });
-
-    // Issue TR8 submit hook: set action then submit
-    document.getElementById("issueTr8Submit")?.addEventListener("click", function(){
-        if (!tr8Form || !tr8Action) return;
-        if (!tr8Action.value) return;
-
-        tr8Form.action = tr8Action.value;
-        tr8Form.submit();
+                onConfirm: () => postForm(data.urls.cancel),
+            });
+        }
     });
 });
 </script>
