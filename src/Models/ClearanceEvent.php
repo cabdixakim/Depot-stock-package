@@ -4,16 +4,19 @@ namespace Optima\DepotStock\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class ClearanceDocument extends Model
+class ClearanceEvent extends Model
 {
-    protected $table = 'clearance_documents';
-
     protected $fillable = [
         'clearance_id',
-        'type',
-        'file_path',
-        'original_name',
-        'uploaded_by',
+        'event',
+        'from_status',
+        'to_status',
+        'user_id',
+        'meta',
+    ];
+
+    protected $casts = [
+        'meta' => 'array',
     ];
 
     public function clearance()
