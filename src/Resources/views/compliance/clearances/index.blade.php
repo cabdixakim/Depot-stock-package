@@ -4,7 +4,7 @@
 @php
     use Carbon\Carbon;
 
-    // If controller doesn't pass these yet, the view stays safe.
+    // Safe defaults so the view never explodes if controller hasn't wired stats yet.
     $stats = $stats ?? [
         'total' => null,
         'draft' => null,
@@ -22,27 +22,8 @@
     $submittedStaleHours = $submittedStaleHours ?? 24;
     $tr8IssuedStaleHours = $tr8IssuedStaleHours ?? 24;
 
-    // optional: controller can pass an attention collection
     $attention = $attention ?? collect();
-    // optional: controller can pass clients collection for filter dropdown
     $clients = $clients ?? collect();
-
-    // Helper functions for badges
-    $badgeClass = function ($status) {
-        return match ($status) {
-            'draft' => 'bg-secondary',
-            'submitted' => 'bg-warning text-dark',
-            'tr8_issued' => 'bg-info text-dark',
-            'arrived' => 'bg-primary',
-            'offloaded' => 'bg-success',
-            'cancelled' => 'bg-danger',
-            default => 'bg-light text-dark'
-        };
-    };
-
-    $statusLabel = function ($status) {
-        return strtoupper(str_replace('_', ' ', (string)$status));
-    };
 @endphp
 
 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -52,7 +33,7 @@
     </div>
 
     <div class="d-flex gap-2">
-        {{-- ✅ Client-side export buttons (NO routes) --}}
+        {{-- ✅ Client-side export buttons --}}
         <button id="export-xlsx" type="button" class="btn btn-outline-secondary btn-sm">
             Export Excel
         </button>
@@ -196,7 +177,7 @@
                                 $age = $c->updated_at ? Carbon::parse($c->updated_at)->diffForHumans(null, true) : '—';
                             @endphp
                             <tr>
-                                <td><span class="badge {{ $badgeClass($c->status) }}">{{ $statusLabel($c->status) }}</span></td>
+                                <td><span class="badge bg-secondary">{{ strtoupper(str_replace('_',' ', $c->status)) }}</span></td>
                                 <td>{{ $c->client->name ?? '—' }}</td>
                                 <td class="fw-semibold">{{ $c->truck_number }}</td>
                                 <td>{{ $c->tr8_number ?? '—' }}</td>
@@ -292,6 +273,7 @@
     #clearances-table .tabulator-row:hover {
         background: rgba(0,0,0,.02);
     }
+
     .status-pill {
         display: inline-flex;
         align-items: center;
@@ -320,32 +302,25 @@
         color: inherit;
     }
     .mini-btn:hover { background: rgba(0,0,0,.03); }
-    .mini-btn-danger { border-color: rgba(220,53,69,.35); color: #b02a37; }
 </style>
 @endpush
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Build query params from the filter form (so table data respects current filters)
-    function currentQueryString() {
-        const params = new URLSearchParams(window.location.search);
-        return params.toString();
-    }
-
     const tableEl = document.getElementById('clearances-table');
     if (!tableEl || !window.Tabulator) return;
 
     function statusPill(status) {
         const s = (status || '').toString();
         const cls = 'pill-' + s;
-        const label = s.replaceAll('_', ' ').toUpperCase();
-        return `<span class="status-pill ${cls}">${label || '—'}</span>`;
+        const label = s ? s.replaceAll('_', ' ').toUpperCase() : '—';
+        return `<span class="status-pill ${cls}">${label}</span>`;
     }
 
-    // ✅ Data endpoint: add this route later in controller (depot.compliance.clearances.data)
-    // For now we attempt to hit it; if it doesn't exist yet you’ll see 404 in network.
-    const dataUrl = `{{ route('depot.compliance.clearances.data') ?? '' }}`;
+    // ✅ IMPORTANT: DO NOT use route() here (it will 500 if route not defined).
+    // We call the URL directly. You WILL define this route next.
+    const dataUrl = "{{ url('depot/compliance/clearances/data') }}";
 
     window.clearancesTable = new Tabulator(tableEl, {
         layout: "fitColumns",
@@ -354,56 +329,39 @@ document.addEventListener('DOMContentLoaded', function () {
         paginationSize: 20,
         ajaxURL: dataUrl,
         ajaxParams: function () {
-            const params = Object.fromEntries(new URLSearchParams(window.location.search).entries());
-            return params;
+            return Object.fromEntries(new URLSearchParams(window.location.search).entries());
         },
         ajaxResponse: function(url, params, response){
-            // Accept either {data: []} or [] formats
             if (Array.isArray(response)) return response;
             return response.data || [];
         },
         columns: [
-            {title: "Status", field: "status", width: 140, formatter: function(cell){ return statusPill(cell.getValue()); }},
-            {title: "Client", field: "client_name", minWidth: 180},
+            {title: "Status", field: "status", width: 150, formatter: (cell) => statusPill(cell.getValue())},
+            {title: "Client", field: "client_name", minWidth: 200},
             {title: "Truck", field: "truck_number", minWidth: 140},
             {title: "Trailer", field: "trailer_number", minWidth: 140},
             {title: "Loaded @20°C", field: "loaded_20_l", hozAlign:"right", formatter:"money", formatterParams:{precision: 3}},
-            {title: "TR8", field: "tr8_number", minWidth: 120},
+            {title: "TR8", field: "tr8_number", minWidth: 140},
             {title: "Border", field: "border_point", minWidth: 140},
-            {title: "Submitted", field: "submitted_at", minWidth: 160},
-            {title: "Issued", field: "tr8_issued_at", minWidth: 160},
-            {title: "Updated by", field: "updated_by_name", minWidth: 160},
-            {title: "Age", field: "age_human", minWidth: 110},
+            {title: "Submitted", field: "submitted_at", minWidth: 170},
+            {title: "Issued", field: "tr8_issued_at", minWidth: 170},
+            {title: "Updated by", field: "updated_by_name", minWidth: 170},
+            {title: "Age", field: "age_human", minWidth: 120},
             {
-                title: "Actions",
+                title: "Open",
                 field: "id",
                 hozAlign: "right",
-                width: 220,
+                width: 120,
                 formatter: function(cell){
                     const row = cell.getRow().getData();
                     const openUrl = `{{ url('depot/compliance/clearances') }}/${row.id}`;
-                    let html = `<a class="mini-btn" href="${openUrl}">Open</a>`;
-
-                    @if(auth()->user()->hasRole('admin|compliance'))
-                        if (row.status === 'draft') {
-                            html += ` <a class="mini-btn" href="${openUrl}">Submit</a>`;
-                        } else if (row.status === 'submitted') {
-                            html += ` <a class="mini-btn" href="${openUrl}#issue-tr8">Issue TR8</a>`;
-                        } else if (row.status === 'tr8_issued') {
-                            html += ` <a class="mini-btn" href="${openUrl}">Arrived</a>`;
-                        }
-                        if (['draft','submitted','tr8_issued','arrived'].includes(row.status)) {
-                            html += ` <a class="mini-btn mini-btn-danger" href="${openUrl}">Cancel</a>`;
-                        }
-                    @endif
-
-                    return html;
+                    return `<a class="mini-btn" href="${openUrl}">Open</a>`;
                 }
             },
         ],
     });
 
-    // ✅ Client-side exports
+    // ✅ Client-side exports (filters affect export)
     document.getElementById('export-xlsx')?.addEventListener('click', function () {
         window.clearancesTable.download("xlsx", "compliance_clearances.xlsx");
     });
