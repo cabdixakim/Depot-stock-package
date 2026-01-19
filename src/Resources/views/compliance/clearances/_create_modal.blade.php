@@ -122,7 +122,7 @@
 </div>
 
 @push('scripts')
-<script>
+
 /**
  * Create Clearance modal controller
  * - open: index page button uses #btnOpenCreateClearance
@@ -151,5 +151,5 @@ document.addEventListener("DOMContentLoaded", () => {
   // Expose if you ever need it elsewhere
   window.__createClearanceModal = { open, close };
 });
-</script>
+
 @endpush
