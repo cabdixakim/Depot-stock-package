@@ -262,6 +262,9 @@ Route::middleware(['web','auth', 'role:admin,compliance,accountant'])
         Route::get('/clearances', [ClearanceController::class, 'index'])
             ->name('clearances.index');
 
+        Route::get('/clearances/data', [ClearanceController::class, 'data'])
+    ->name('clearances.data');
+
         Route::get('/clearances/create', [ClearanceController::class, 'create'])
             ->middleware('role:admin,compliance')
             ->name('clearances.create');
