@@ -241,57 +241,72 @@
                     {!! $pill('Cancelled', (int)$stats['cancelled'], 'cancelled', 'rose') !!}
                 </div>
 
-                {{-- FILTERS: keep one line on desktop; small controls; stack on mobile --}}
-                <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
-                    <div class="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-end lg:gap-2">
-                        <div class="w-full lg:w-[14rem]">
-                            <label class="text-[11px] font-semibold text-gray-600">Client</label>
-                            <select name="client_id" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
-                                <option value="">All</option>
-                                @foreach($clients as $c)
-                                    <option value="{{ $c->id }}" @selected((string)$fClient === (string)$c->id)>{{ $c->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+{{-- FILTERS: one line on desktop, stacks on mobile --}}
+<form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
+    <div class="flex flex-col gap-2 lg:flex-row lg:items-end lg:gap-2 lg:flex-nowrap">
 
-                        <div class="w-full lg:w-[10rem]">
-                            <label class="text-[11px] font-semibold text-gray-600">Status</label>
-                            <select name="status" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
-                                <option value="">All</option>
-                                <option value="draft" @selected($fStatus==='draft')>Draft</option>
-                                <option value="submitted" @selected($fStatus==='submitted')>Submitted</option>
-                                <option value="tr8_issued" @selected($fStatus==='tr8_issued')>TR8 issued</option>
-                                <option value="arrived" @selected($fStatus==='arrived')>Arrived</option>
-                                <option value="cancelled" @selected($fStatus==='cancelled')>Cancelled</option>
-                            </select>
-                        </div>
+        {{-- Client --}}
+        <div class="w-full lg:w-[12rem] shrink-0">
+            <label class="text-[11px] font-semibold text-gray-600">Client</label>
+            <select name="client_id"
+                class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
+                <option value="">All</option>
+                @foreach($clients as $c)
+                    <option value="{{ $c->id }}" @selected((string)$fClient === (string)$c->id)>{{ $c->name }}</option>
+                @endforeach
+            </select>
+        </div>
 
-                        <div class="w-full lg:flex-1 lg:min-w-[16rem]">
-                            <label class="text-[11px] font-semibold text-gray-600">Search</label>
-                            <input name="q" value="{{ $fSearch }}" placeholder="Truck, trailer, TR8, invoice…" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
-                        </div>
+        {{-- Status --}}
+        <div class="w-full lg:w-[10rem] shrink-0">
+            <label class="text-[11px] font-semibold text-gray-600">Status</label>
+            <select name="status"
+                class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
+                <option value="">All</option>
+                <option value="draft" @selected($fStatus==='draft')>Draft</option>
+                <option value="submitted" @selected($fStatus==='submitted')>Submitted</option>
+                <option value="tr8_issued" @selected($fStatus==='tr8_issued')>TR8 issued</option>
+                <option value="arrived" @selected($fStatus==='arrived')>Arrived</option>
+                <option value="cancelled" @selected($fStatus==='cancelled')>Cancelled</option>
+            </select>
+        </div>
 
-                        <div class="w-full sm:flex sm:gap-2 lg:w-auto lg:flex lg:gap-2">
-                            <div class="flex-1 lg:w-[10.5rem]">
-                                <label class="text-[11px] font-semibold text-gray-600">From</label>
-                                <input type="date" name="from" value="{{ $fFrom }}" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
-                            </div>
-                            <div class="flex-1 lg:w-[10.5rem]">
-                                <label class="text-[11px] font-semibold text-gray-600">To</label>
-                                <input type="date" name="to" value="{{ $fTo }}" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
-                            </div>
-                        </div>
+        {{-- Search (flexes) --}}
+        <div class="w-full lg:flex-1 min-w-0">
+            <label class="text-[11px] font-semibold text-gray-600">Search</label>
+            <input name="q" value="{{ $fSearch }}" placeholder="Truck, trailer, TR8, invoice…"
+                class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
+        </div>
 
-                        <div class="w-full lg:w-auto lg:ml-auto flex items-center justify-end gap-2 pt-1">
-                            <a href="{{ url()->current() }}" class="h-9 inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
-                                Reset
-                            </a>
-                            <button type="submit" class="h-9 inline-flex items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
-                                Apply
-                            </button>
-                        </div>
-                    </div>
-                </form>
+        {{-- Dates (stay inline on desktop) --}}
+        <div class="w-full sm:flex sm:gap-2 lg:w-auto lg:flex lg:gap-2 shrink-0">
+            <div class="flex-1 lg:w-[10rem] min-w-0">
+                <label class="text-[11px] font-semibold text-gray-600">From</label>
+                <input type="date" name="from" value="{{ $fFrom }}"
+                    class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
+            </div>
+
+            <div class="flex-1 lg:w-[10rem] min-w-0">
+                <label class="text-[11px] font-semibold text-gray-600">To</label>
+                <input type="date" name="to" value="{{ $fTo }}"
+                    class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
+            </div>
+        </div>
+
+        {{-- Buttons (always on the far right on desktop) --}}
+        <div class="w-full lg:w-auto lg:ml-auto flex items-center justify-end gap-2 pt-1 shrink-0">
+            <a href="{{ url()->current() }}"
+               class="h-9 inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
+                Reset
+            </a>
+            <button type="submit"
+                class="h-9 inline-flex items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
+                Apply
+            </button>
+        </div>
+
+    </div>
+</form>
 
                 {{-- LIST HEADER + EXPORTS --}}
                 <div id="clearances" class="mt-5 flex items-center justify-between gap-3">
