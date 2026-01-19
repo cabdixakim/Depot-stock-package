@@ -1,9 +1,8 @@
 @extends('depot-stock::layouts.app')
 
-@section('content')
+@section(''title', $title ?? 'Compliance'')
 @php
     use Optima\DepotStock\Models\Clearance;
-    use Illuminate\Support\Facades\DB;
 
     $clients    = $clients ?? collect();
     $clearances = $clearances ?? null;
@@ -109,20 +108,20 @@
                         </div>
                     </div>
 
-                    {{-- Actions area --}}
-                    <div class="flex items-center gap-8">
+                    {{-- Actions area (keep buttons FAR apart) --}}
+                    <div class="flex items-center justify-end gap-4 sm:gap-6 lg:gap-10">
                         @if($canCreate)
                             <button
                                 type="button"
-                                class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+                                class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                                 id="btnOpenCreateClearance"
                             >
-                                <span class="text-base leading-none">+</span>
-                                <span class="hidden sm:inline">New</span>
+                                <span class="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/10 text-base leading-none">+</span>
+                                <span>New clearance</span>
                             </button>
                         @endif
 
-                        {{-- Needs attention (icon button + badge + responsive panel) --}}
+                        {{-- Needs attention (bell icon + badge + responsive fixed panel) --}}
                         <div class="relative" id="attWrap">
                             <button
                                 type="button"
@@ -132,27 +131,26 @@
                                 aria-expanded="false"
                                 title="Needs attention"
                             >
-                                {{-- “Warning/queue” icon (better than bell for ops) --}}
+                                {{-- Bell icon (modern) --}}
                                 <svg class="h-5 w-5 text-gray-700 group-hover:text-gray-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                    <path d="M12 8v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                                    <path d="M12 17h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
-                                    <path d="M10.3 4.9 3.8 16.2a2 2 0 0 0 1.7 3h13a2 2 0 0 0 1.7-3L13.7 4.9a2 2 0 0 0-3.4 0Z"
-                                          stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                                    <path d="M12 22a2.4 2.4 0 0 0 2.35-2H9.65A2.4 2.4 0 0 0 12 22Z" fill="currentColor" opacity=".9"/>
+                                    <path d="M20 17H4c1.7-1.4 2.4-3.1 2.4-5.7V9.4C6.4 6.5 8.5 4.2 12 4.2s5.6 2.3 5.6 5.2v1.9c0 2.6.7 4.3 2.4 5.7Z"
+                                          stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
                                 </svg>
 
-                                {{-- ALWAYS show badge container (so it doesn’t “vanish” visually) --}}
+                                {{-- Badge pinned like social apps --}}
                                 <span class="absolute -top-2 -right-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-bold shadow
                                     {{ $attTotal > 0 ? 'bg-rose-600 text-white' : 'bg-gray-200 text-gray-700' }}">
                                     {{ $attTotal }}
                                 </span>
                             </button>
 
-                            {{-- PANEL: 3x wider + responsive + never off-screen --}}
+                            {{-- PANEL: fixed, wide, responsive, never off-screen --}}
                             <div
                                 id="attentionPanel"
-                                class="hidden absolute right-0 mt-2 z-40 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
-                                       w-[min(48rem,calc(100vw-1rem))]"
-                                style="max-width: calc(100vw - 1rem);"
+                                class="hidden fixed z-50 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
+                                       w-[min(56rem,calc(100vw-1rem))]"
+                                style="top: 5rem; right: .5rem; max-width: calc(100vw - 1rem);"
                             >
                                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                                     <div class="text-sm font-semibold text-gray-900">Needs attention</div>
@@ -164,49 +162,49 @@
                                 <div class="p-3 text-[12px] text-gray-600">
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <a href="{{ $makeFilterUrl(['status' => 'submitted', '__att' => 'stuck_submitted']) }}#clearances"
-                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2 hover:bg-gray-50">
                                             <div class="min-w-0">
-                                                <div class="text-sm font-semibold text-gray-900">Stuck in Submitted</div>
-                                                <div class="text-xs text-gray-500">Waiting TR8 issuance</div>
+                                                <div class="text-[13px] font-semibold text-gray-900">Stuck in Submitted</div>
+                                                <div class="text-[11px] text-gray-500">Waiting TR8 issuance</div>
                                             </div>
                                             <div class="inline-flex items-center gap-3">
-                                                <span class="rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900 border border-amber-200">{{ $attStuckSubmitted }}</span>
+                                                <span class="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-900 border border-amber-200">{{ $attStuckSubmitted }}</span>
                                                 <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
 
                                         <a href="{{ $makeFilterUrl(['status' => 'tr8_issued', '__att' => 'stuck_tr8_issued']) }}#clearances"
-                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2 hover:bg-gray-50">
                                             <div class="min-w-0">
-                                                <div class="text-sm font-semibold text-gray-900">TR8 issued, not arrived</div>
-                                                <div class="text-xs text-gray-500">Chase truck / dispatch</div>
+                                                <div class="text-[13px] font-semibold text-gray-900">TR8 issued, not arrived</div>
+                                                <div class="text-[11px] text-gray-500">Chase truck / dispatch</div>
                                             </div>
                                             <div class="inline-flex items-center gap-3">
-                                                <span class="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-900 border border-blue-200">{{ $attStuckTr8 }}</span>
+                                                <span class="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-900 border border-blue-200">{{ $attStuckTr8 }}</span>
                                                 <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
 
                                         <a href="{{ $makeFilterUrl(['status' => 'tr8_issued', '__att' => 'missing_tr8_number']) }}#clearances"
-                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2 hover:bg-gray-50">
                                             <div class="min-w-0">
-                                                <div class="text-sm font-semibold text-gray-900">Missing TR8 number</div>
-                                                <div class="text-xs text-gray-500">Data risk</div>
+                                                <div class="text-[13px] font-semibold text-gray-900">Missing TR8 number</div>
+                                                <div class="text-[11px] text-gray-500">Data risk</div>
                                             </div>
                                             <div class="inline-flex items-center gap-3">
-                                                <span class="rounded-full bg-rose-50 px-2 py-1 text-xs font-bold text-rose-900 border border-rose-200">{{ $attMissingTr8 }}</span>
+                                                <span class="rounded-full bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-900 border border-rose-200">{{ $attMissingTr8 }}</span>
                                                 <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
 
                                         <a href="{{ $makeFilterUrl(['__att' => 'missing_documents']) }}#clearances"
-                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2 hover:bg-gray-50">
                                             <div class="min-w-0">
-                                                <div class="text-sm font-semibold text-gray-900">Missing documents</div>
-                                                <div class="text-xs text-gray-500">Audit risk</div>
+                                                <div class="text-[13px] font-semibold text-gray-900">Missing documents</div>
+                                                <div class="text-[11px] text-gray-500">Audit risk</div>
                                             </div>
                                             <div class="inline-flex items-center gap-3">
-                                                <span class="rounded-full bg-gray-50 px-2 py-1 text-xs font-bold text-gray-800 border border-gray-200">{{ $attMissingDocs }}</span>
+                                                <span class="rounded-full bg-gray-50 px-2 py-1 text-[11px] font-bold text-gray-800 border border-gray-200">{{ $attMissingDocs }}</span>
                                                 <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
@@ -243,7 +241,7 @@
                     {!! $pill('Cancelled', (int)$stats['cancelled'], 'cancelled', 'rose') !!}
                 </div>
 
-                {{-- FILTERS: ONE LINE ON DESKTOP, STACK ON MOBILE --}}
+                {{-- FILTERS: keep one line on desktop; small controls; stack on mobile --}}
                 <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
                     <div class="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-end lg:gap-2">
                         <div class="w-full lg:w-[14rem]">
@@ -365,7 +363,7 @@
 
 @push('styles')
 <style>
-    /* Tabulator polish */
+    /* Tabulator polish + compact row height */
     #clearancesTable .tabulator{
         border: 0;
         border-radius: 14px;
@@ -388,6 +386,11 @@
     }
     #clearancesTable .tabulator-row{
         border-bottom: 1px solid rgba(0,0,0,.04);
+        min-height: 40px;
+    }
+    #clearancesTable .tabulator-cell{
+        padding-top: 6px;
+        padding-bottom: 6px;
     }
     #clearancesTable .tabulator-row:hover{
         background: rgba(2,6,23,.03);
@@ -423,10 +426,13 @@ document.addEventListener("DOMContentLoaded", function(){
         el.classList.remove('flex');
     };
 
+    // Close outside modals + close buttons
     document.addEventListener('click', (e) => {
         const bd = e.target.closest('[data-modal-backdrop]');
         if (bd) {
-            closeModal(bd.getAttribute('data-modal-backdrop') === 'confirm' ? 'confirmModal' : bd.getAttribute('data-modal-backdrop'));
+            const which = bd.getAttribute('data-modal-backdrop');
+            if (which === 'confirm') closeModal('confirmModal');
+            return;
         }
         const cl = e.target.closest('[data-modal-close]');
         if (cl) {
@@ -436,14 +442,14 @@ document.addEventListener("DOMContentLoaded", function(){
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            closeModal('confirmModal');
-            // create modal id is inside include; if yours is "createClearanceModal" this will close it too:
-            const cm = document.getElementById('createClearanceModal');
-            if (cm && !cm.classList.contains('hidden')) closeModal('createClearanceModal');
-            // attention panel:
-            closeAttention();
-        }
+        if (e.key !== 'Escape') return;
+        closeModal('confirmModal');
+
+        // create modal id from include
+        const cm = document.getElementById('createClearanceModal');
+        if (cm && !cm.classList.contains('hidden')) closeModal('createClearanceModal');
+
+        closeAttention();
     });
 
     // --- Confirm modal API
@@ -465,7 +471,7 @@ document.addEventListener("DOMContentLoaded", function(){
         });
     });
 
-    // --- Attention panel toggle (responsive)
+    // --- Attention panel toggle (fixed + close on outside)
     const attBtn = document.getElementById("btnAttention");
     const attPanel = document.getElementById("attentionPanel");
     const attWrap = document.getElementById("attWrap");
@@ -479,16 +485,6 @@ document.addEventListener("DOMContentLoaded", function(){
         if (!attPanel) return;
         attPanel.classList.remove("hidden");
         attBtn?.setAttribute("aria-expanded","true");
-
-        // Ensure it never falls off screen left
-        const rect = attPanel.getBoundingClientRect();
-        if (rect.left < 8) {
-            attPanel.style.left = '0.5rem';
-            attPanel.style.right = 'auto';
-        } else {
-            attPanel.style.left = '';
-            attPanel.style.right = '0';
-        }
     }
 
     attBtn?.addEventListener("click", function(){
@@ -500,10 +496,10 @@ document.addEventListener("DOMContentLoaded", function(){
     document.addEventListener("click", function(e){
         if (!attWrap || !attPanel) return;
         if (e.target.closest("[data-att-close]")) { closeAttention(); return; }
-        if (!attWrap.contains(e.target)) closeAttention();
+        if (!attWrap.contains(e.target) && !attPanel.contains(e.target)) closeAttention();
     });
 
-    // --- URL builders (so actions NEVER depend on server-provided urls)
+    // --- URL builders
     const showUrl   = (id) => `${baseUrl}/${id}`;
     const submitUrl = (id) => `${baseUrl}/${id}/submit`;
     const issueUrl  = (id) => `${baseUrl}/${id}/issue-tr8`;
@@ -528,7 +524,7 @@ document.addEventListener("DOMContentLoaded", function(){
         return true;
     }
 
-    // --- Tabulator setup (REMOTE pagination + reshape response)
+    // --- Tabulator (REMOTE pagination)
     const table = new Tabulator("#clearancesTable", {
         layout: "fitColumns",
         responsiveLayout: "collapse",
@@ -540,20 +536,16 @@ document.addEventListener("DOMContentLoaded", function(){
         ajaxURL: dataUrl,
         ajaxParams: () => Object.fromEntries(new URLSearchParams(window.location.search).entries()),
 
-        // THIS is the key fix: reshape your controller response to Tabulator’s expected shape
+        // controller returns: {data: [...], meta:{...}}
         ajaxResponse: function(url, params, resp){
-            // resp is: {data: [...], meta: {...}}
-            const shaped = {
+            return {
                 data: Array.isArray(resp?.data) ? resp.data : [],
                 current_page: resp?.meta?.current_page ?? 1,
                 last_page: resp?.meta?.last_page ?? 1,
                 per_page: resp?.meta?.per_page ?? 20,
                 total: resp?.meta?.total ?? (Array.isArray(resp?.data) ? resp.data.length : 0),
             };
-            console.log("Tabulator shaped response:", shaped);
-            return shaped;
         },
-
         paginationDataReceived: {
             "last_page":"last_page",
             "data":"data",
@@ -562,38 +554,45 @@ document.addEventListener("DOMContentLoaded", function(){
         },
 
         rowClick: function(e, row){
-            // Click on action buttons shouldn't navigate
             if (e.target.closest("button")) return;
             const id = row.getData().id;
             if (id) window.location.href = showUrl(id);
+        },
+
+        rowFormatter: function(row){
+            const s = (row.getData().status || "").toString();
+            const el = row.getElement();
+            el.classList.remove("bg-gray-50","bg-amber-50","bg-blue-50","bg-emerald-50","bg-rose-50");
+            if (s === "draft") el.classList.add("bg-gray-50");
+            if (s === "submitted") el.classList.add("bg-amber-50");
+            if (s === "tr8_issued") el.classList.add("bg-blue-50");
+            if (s === "arrived") el.classList.add("bg-emerald-50");
+            if (s === "cancelled") el.classList.add("bg-rose-50");
         },
 
         columns: [
             {
                 title: "STATUS",
                 field: "status",
-                width: 160,
+                width: 150,
                 formatter: (cell) => {
                     const s = (cell.getValue() || "").toString();
                     const label = s.replaceAll("_"," ").toUpperCase();
                     const cls = ({
-                        draft: "border-gray-200 bg-gray-50 text-gray-900",
-                        submitted: "border-amber-200 bg-amber-50 text-amber-900",
-                        tr8_issued: "border-blue-200 bg-blue-50 text-blue-900",
-                        arrived: "border-emerald-200 bg-emerald-50 text-emerald-900",
-                        cancelled: "border-rose-200 bg-rose-50 text-rose-900",
-                    })[s] || "border-gray-200 bg-gray-50 text-gray-900";
+                        draft: "border-gray-200 bg-white/60 text-gray-900",
+                        submitted: "border-amber-200 bg-white/60 text-amber-900",
+                        tr8_issued: "border-blue-200 bg-white/60 text-blue-900",
+                        arrived: "border-emerald-200 bg-white/60 text-emerald-900",
+                        cancelled: "border-rose-200 bg-white/60 text-rose-900",
+                    })[s] || "border-gray-200 bg-white/60 text-gray-900";
                     return `<span class="inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${cls}">${label || '-'}</span>`;
                 }
             },
             { title: "CLIENT", field: "client_name", minWidth: 180 },
             { title: "TRUCK", field: "truck_number", width: 140 },
             { title: "TRAILER", field: "trailer_number", width: 150 },
-            { title: "LOADED @20°C", field: "loaded_20_l", hozAlign:"right", width: 150 },
             { title: "TR8", field: "tr8_number", width: 140 },
             { title: "BORDER", field: "border_point", width: 150 },
-            { title: "SUBMITTED", field: "submitted_at", width: 170 },
-            { title: "ISSUED", field: "tr8_issued_at", width: 170 },
             { title: "UPDATED BY", field: "updated_by_name", width: 170 },
             { title: "AGE", field: "age_human", width: 120 },
             {
@@ -608,34 +607,30 @@ document.addEventListener("DOMContentLoaded", function(){
 
                     const btn = (label, action, tone="gray") => {
                         const toneClass = ({
-                            gray: "border-gray-200 hover:bg-gray-50 text-gray-800",
                             dark: "border-gray-900 bg-gray-900 text-white hover:bg-gray-800",
                             amber:"border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
-                            blue: "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
                             rose: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
                             emerald:"border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
-                        })[tone] || "border-gray-200 hover:bg-gray-50 text-gray-800";
+                        })[tone] || "border-gray-200 bg-white/70 hover:bg-white text-gray-800";
 
                         return `<button type="button" class="px-3 py-1.5 rounded-xl border text-xs font-semibold ${toneClass}" data-action="${action}" data-id="${id}">${label}</button>`;
                     };
 
-                    if (!canAct) return `<span class="text-xs text-gray-400">No actions</span>`;
+                    if (!canAct) return `<span class="text-xs text-gray-400">—</span>`;
 
-                    let html = `<div class="flex flex-wrap items-center gap-2">`;
-
+                    let html = `<div class="flex flex-nowrap items-center gap-2">`;
                     if (s === 'draft') html += btn("Submit", "submit", "dark");
                     if (s === 'submitted') {
                         html += btn("Issue TR8", "issue", "amber");
                         html += btn("Cancel", "cancel", "rose");
                     }
                     if (s === 'tr8_issued') {
-                        html += btn("Mark arrived", "arrive", "emerald");
+                        html += btn("Arrived", "arrive", "emerald");
                         html += btn("Cancel", "cancel", "rose");
                     }
                     if (s === 'arrived') {
                         html += btn("Cancel", "cancel", "rose");
                     }
-
                     html += `</div>`;
                     return html;
                 }
@@ -643,7 +638,7 @@ document.addEventListener("DOMContentLoaded", function(){
         ],
     });
 
-    // --- Action handler (with confirm modal)
+    // --- Action handler (confirm modal)
     document.addEventListener("click", async function(e){
         const btn = e.target.closest("button[data-action][data-id]");
         if (!btn) return;
@@ -656,29 +651,29 @@ document.addEventListener("DOMContentLoaded", function(){
                 const ok = await confirmUI({title:"Submit clearance", text:"Submit this clearance now?"});
                 if (!ok) return;
                 await postJson(submitUrl(id));
-                window.location.reload();
+                table.replaceData();
             }
 
             if (action === "arrive") {
                 const ok = await confirmUI({title:"Mark arrived", text:"Mark this clearance as arrived?"});
                 if (!ok) return;
                 await postJson(arriveUrl(id));
-                window.location.reload();
+                table.replaceData();
             }
 
             if (action === "cancel") {
-                const ok = await confirmUI({title:"Cancel clearance", text:"Cancel this clearance? This is a workflow action."});
+                const ok = await confirmUI({title:"Cancel clearance", text:"Cancel this clearance?"});
                 if (!ok) return;
                 await postJson(cancelUrl(id));
-                window.location.reload();
+                table.replaceData();
             }
 
             if (action === "issue") {
-                // v1: prompt (you said later you want a real modal with file upload)
+                // v1: prompt (later: modal + file upload)
                 const tr8 = prompt("Enter TR8 number:");
                 if (!tr8) return;
                 await postJson(issueUrl(id), { tr8_number: tr8 });
-                window.location.reload();
+                table.replaceData();
             }
         } catch(err) {
             alert(("Action failed:\n\n" + (err?.message || err)).slice(0, 500));
@@ -686,7 +681,7 @@ document.addEventListener("DOMContentLoaded", function(){
         }
     });
 
-    // --- Exports (client-side on current page only; remote pagination means it exports current loaded set)
+    // --- Exports
     document.getElementById("btnExportXlsx")?.addEventListener("click", () => {
         table.download("xlsx", "clearances.xlsx", {sheetName:"Clearances"});
     });
@@ -694,7 +689,7 @@ document.addEventListener("DOMContentLoaded", function(){
         table.download("pdf", "clearances.pdf", {orientation:"landscape", title:"Clearances"});
     });
 
-    // --- Create modal open (your include uses createClearanceModal)
+    // --- Create modal open
     document.getElementById("btnOpenCreateClearance")?.addEventListener("click", () => {
         const modal = document.getElementById("createClearanceModal");
         if (!modal) return;
@@ -702,17 +697,7 @@ document.addEventListener("DOMContentLoaded", function(){
         modal.classList.add("flex");
     });
 
-    // --- Click outside close for create modal (if it has a backdrop)
-    document.addEventListener('click', (e) => {
-        const cm = document.getElementById("createClearanceModal");
-        if (!cm || cm.classList.contains("hidden")) return;
-        if (e.target === cm) { // if modal wrapper is backdrop
-            cm.classList.add("hidden");
-            cm.classList.remove("flex");
-        }
-    });
-
-    // When coming from attention links, smooth scroll
+    // --- Smooth scroll when coming from attention links
     if (window.location.hash === "#clearances") {
         const el = document.getElementById("clearances");
         if (el) el.scrollIntoView({behavior:"smooth", block:"start"});

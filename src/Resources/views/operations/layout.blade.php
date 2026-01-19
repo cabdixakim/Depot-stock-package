@@ -7,7 +7,7 @@
 <style>
     /* Base sidebar behaviour */
     .ops-sidebar {
-        transition: transform 0.2s ease-out;
+        transition: transform 0.2s ease-out; 
         will-change: transform;
     }
 
