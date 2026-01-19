@@ -26,15 +26,12 @@ use Optima\DepotStock\Http\Controllers\TankController;
 use Optima\DepotStock\Http\Controllers\Settings\AccountController;
 use Optima\DepotStock\Http\Controllers\Portal\ClientPortalController;
 
+use Optima\DepotStock\Http\Controllers\Compliance\ClearanceController;
+
 // ✅ NEW: Depot operations controllers
 use Optima\DepotStock\Http\Controllers\DepotOperationsController;
 use Optima\DepotStock\Http\Controllers\DepotReconController;
 use Optima\DepotStock\Http\Controllers\OperationsClientController;
-
-//Compliance
-use Optima\DepotStock\Http\Controllers\Compliance\ClearanceController;
-
-
 
 // =========================================================
 // STAFF AREA (/depot/...)
@@ -254,11 +251,10 @@ Route::middleware(['web', 'auth', 'client.portal'])
         Route::post('/account/password', [ClientPortalController::class, 'updatePassword'])->name('account.password');
     });
 
+        
+//         
 
-//  =========================================================
-// COMPLIANCE MODULE ROUTES (/depot/compliance/...)
-//  =========================================================
-Route::middleware(['auth', 'role:admin,compliance,accountant'])
+Route::middleware(['web','auth', 'role:admin,compliance,accountant'])
     ->prefix('depot/compliance')
     ->name('depot.compliance.')
     ->group(function () {
