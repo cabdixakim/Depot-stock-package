@@ -1,64 +1,86 @@
-{{-- depot-stock::compliance/clearances/index.blade.php --}}
 @extends('depot-stock::layouts.app')
 
 @section('content')
 @php
-    // -------------------------------
-    // Safety defaults (avoid undefined)
-    // -------------------------------
+    use Optima\DepotStock\Models\Clearance;
+    use Illuminate\Support\Facades\DB;
+
     $clients    = $clients ?? collect();
     $clearances = $clearances ?? null;
 
-    // IMPORTANT: if controller doesn't pass stats, show "—" (not fake zeros)
-    $stats = $stats ?? [
-        'total' => null,
-        'draft' => null,
-        'submitted' => null,
-        'tr8_issued' => null,
-        'arrived' => null,
-        'cancelled' => null,
-        'stuck_submitted' => null,
-        'stuck_tr8_issued' => null,
-        'missing_tr8_number' => null,
-        'missing_documents' => null,
-    ];
-
-    // -------------------------------
-    // Role gating (User::hasRole expects STRING only; avoid passing arrays)
-    // -------------------------------
-    $u = auth()->user();
-    $roleNames = $u?->roles?->pluck('name')->map(fn($r) => strtolower((string)$r))->all() ?? [];
-    $canCreate = in_array('admin', $roleNames, true) || in_array('owner', $roleNames, true) || in_array('compliance', $roleNames, true);
-    $canAct    = $canCreate;
-
-    // -------------------------------
-    // Current filters (server-side GET)
-    // -------------------------------
+    // Filters
     $fClient = request('client_id');
     $fStatus = request('status');
     $fSearch = request('q');
     $fFrom   = request('from');
     $fTo     = request('to');
 
-    // -------------------------------
-    // Needs-attention totals
-    // -------------------------------
-    $attStuckSubmitted = (int)($stats['stuck_submitted'] ?? 0);
-    $attStuckTr8       = (int)($stats['stuck_tr8_issued'] ?? 0);
-    $attMissingTr8     = (int)($stats['missing_tr8_number'] ?? 0);
-    $attMissingDocs    = (int)($stats['missing_documents'] ?? 0);
-    $attTotal          = $attStuckSubmitted + $attStuckTr8 + $attMissingTr8 + $attMissingDocs;
+    // Roles
+    $u = auth()->user();
+    $roleNames = $u?->roles?->pluck('name')->map(fn($r) => strtolower($r))->all() ?? [];
+    $canCreate = in_array('admin', $roleNames) || in_array('owner', $roleNames) || in_array('compliance', $roleNames);
+    $canAct    = $canCreate;
 
-    // Helper: preserve query string + override
+    // Base query for stats (client/search/date filters apply; status varies per-pill)
+    $statsBase = Clearance::query();
+
+    if ($fClient) $statsBase->where('client_id', $fClient);
+
+    if ($fSearch) {
+        $term = trim($fSearch);
+        $statsBase->where(function ($w) use ($term) {
+            $w->where('truck_number', 'like', "%{$term}%")
+              ->orWhere('trailer_number', 'like', "%{$term}%")
+              ->orWhere('tr8_number', 'like', "%{$term}%")
+              ->orWhere('invoice_number', 'like', "%{$term}%")
+              ->orWhere('delivery_note_number', 'like', "%{$term}%");
+        });
+    }
+
+    if ($fFrom) $statsBase->whereDate('created_at', '>=', $fFrom);
+    if ($fTo)   $statsBase->whereDate('created_at', '<=', $fTo);
+
+    $stats = [
+        'total'      => (clone $statsBase)->count(),
+        'draft'      => (clone $statsBase)->where('status','draft')->count(),
+        'submitted'  => (clone $statsBase)->where('status','submitted')->count(),
+        'tr8_issued' => (clone $statsBase)->where('status','tr8_issued')->count(),
+        'arrived'    => (clone $statsBase)->where('status','arrived')->count(),
+        'cancelled'  => (clone $statsBase)->where('status','cancelled')->count(),
+    ];
+
+    // Needs-attention counts (simple v1 logic; you can refine later)
+    $attStuckSubmitted = (clone $statsBase)
+        ->where('status','submitted')
+        ->whereNull('tr8_issued_at')
+        ->count();
+
+    $attStuckTr8 = (clone $statsBase)
+        ->where('status','tr8_issued')
+        ->whereNull('arrived_at')
+        ->count();
+
+    $attMissingTr8 = (clone $statsBase)
+        ->where('status','tr8_issued')
+        ->where(function($w){
+            $w->whereNull('tr8_number')->orWhere('tr8_number','');
+        })
+        ->count();
+
+    // If you track docs properly, swap this query to real missing-doc logic
+    $attMissingDocs = 0;
+
+    $attTotal = $attStuckSubmitted + $attStuckTr8 + $attMissingTr8 + $attMissingDocs;
+
+    // Helper URL builder (preserve filters)
     $qsBase = array_filter([
         'client_id' => $fClient,
-        'status'    => $fStatus,
         'q'         => $fSearch,
         'from'      => $fFrom,
         'to'        => $fTo,
     ], fn($v) => $v !== null && $v !== '');
 
-    $makeUrl = function(array $override = []) use ($qsBase) {
+    $makeFilterUrl = function(array $override = []) use ($qsBase) {
         $qs = array_merge($qsBase, $override);
         $qs = array_filter($qs, fn($v) => $v !== null && $v !== '');
         return url()->current() . (count($qs) ? ('?' . http_build_query($qs)) : '');
@@ -73,7 +95,7 @@
             <div class="p-5 sm:p-6">
 
                 {{-- HEADER --}}
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex items-start justify-between gap-6">
                     <div class="min-w-0">
                         <div class="text-xs text-gray-500">Compliance</div>
                         <h1 class="mt-1 text-xl font-semibold tracking-tight text-gray-900">Clearances &amp; TR8</h1>
@@ -87,20 +109,20 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    {{-- Actions area --}}
+                    <div class="flex items-center gap-8">
                         @if($canCreate)
                             <button
                                 type="button"
-                                id="btnOpenCreateClearance"
                                 class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
-                                title="Create a new clearance"
+                                id="btnOpenCreateClearance"
                             >
                                 <span class="text-base leading-none">+</span>
                                 <span class="hidden sm:inline">New</span>
                             </button>
                         @endif
 
-                        {{-- Needs attention (icon button + badge + anchored wide panel) --}}
+                        {{-- Needs attention (icon button + badge + responsive panel) --}}
                         <div class="relative" id="attWrap">
                             <button
                                 type="button"
@@ -110,104 +132,82 @@
                                 aria-expanded="false"
                                 title="Needs attention"
                             >
-                                {{-- exclamation icon (more suitable than bell) --}}
+                                {{-- “Warning/queue” icon (better than bell for ops) --}}
                                 <svg class="h-5 w-5 text-gray-700 group-hover:text-gray-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                    <path d="M12 3.5 2.9 20.5a1.2 1.2 0 0 0 1.06 1.8h16.08a1.2 1.2 0 0 0 1.06-1.8L12 3.5Z" stroke="currentColor" stroke-width="1.5" />
-                                    <path d="M12 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                    <path d="M12 17.8h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                    <path d="M12 8v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                    <path d="M12 17h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+                                    <path d="M10.3 4.9 3.8 16.2a2 2 0 0 0 1.7 3h13a2 2 0 0 0 1.7-3L13.7 4.9a2 2 0 0 0-3.4 0Z"
+                                          stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
                                 </svg>
 
-                                @if($attTotal > 0)
-                                    <span class="absolute -top-2 -right-2 inline-flex h-5 min-w-[1.35rem] items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-bold text-white shadow">
-                                        {{ $attTotal }}
-                                    </span>
-                                @endif
+                                {{-- ALWAYS show badge container (so it doesn’t “vanish” visually) --}}
+                                <span class="absolute -top-2 -right-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-bold shadow
+                                    {{ $attTotal > 0 ? 'bg-rose-600 text-white' : 'bg-gray-200 text-gray-700' }}">
+                                    {{ $attTotal }}
+                                </span>
                             </button>
 
-                            {{-- Attention panel (WIDE + responsive) --}}
+                            {{-- PANEL: 3x wider + responsive + never off-screen --}}
                             <div
                                 id="attentionPanel"
-                                class="hidden z-40 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl
-                                       sm:absolute sm:right-0 sm:mt-2 sm:w-[44rem]
-                                       fixed left-4 right-4 top-20 sm:top-auto sm:left-auto sm:right-0"
+                                class="hidden absolute right-0 mt-2 z-40 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
+                                       w-[min(48rem,calc(100vw-1rem))]"
+                                style="max-width: calc(100vw - 1rem);"
                             >
                                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <div class="h-9 w-9 rounded-xl bg-gray-900 text-white flex items-center justify-center">
-                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                                <path d="M12 3.5 2.9 20.5a1.2 1.2 0 0 0 1.06 1.8h16.08a1.2 1.2 0 0 0 1.06-1.8L12 3.5Z" stroke="currentColor" stroke-width="1.5" />
-                                                <path d="M12 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                                <path d="M12 17.8h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <div class="text-sm font-semibold text-gray-900 leading-tight">Needs attention</div>
-                                            <div class="text-[11px] text-gray-500 leading-tight">Tap an item to jump + auto-filter.</div>
-                                        </div>
-                                    </div>
-
-                                    <button type="button"
-                                            class="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                                            data-att-close="1">
+                                    <div class="text-sm font-semibold text-gray-900">Needs attention</div>
+                                    <button type="button" class="rounded-lg px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50" data-att-close="1">
                                         Close
                                     </button>
                                 </div>
 
-                                <div class="p-3">
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <a href="{{ $makeUrl(['status' => 'submitted', '__att' => 'stuck_submitted']) }}#clearances"
-                                           class="group rounded-2xl border border-gray-200 bg-gray-50/60 p-3 hover:bg-gray-50 hover:border-gray-300 transition">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="min-w-0">
-                                                    <div class="text-[13px] font-semibold text-gray-900 leading-snug">Stuck in Submitted</div>
-                                                    <div class="text-[11px] text-gray-500 mt-1">Waiting TR8 issuance · chase border/agent</div>
-                                                </div>
-                                                <div class="shrink-0 flex items-center gap-2">
-                                                    <span class="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-900 border border-amber-200">{{ $attStuckSubmitted }}</span>
-                                                    <span class="text-gray-300 group-hover:text-gray-400">›</span>
-                                                </div>
+                                <div class="p-3 text-[12px] text-gray-600">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <a href="{{ $makeFilterUrl(['status' => 'submitted', '__att' => 'stuck_submitted']) }}#clearances"
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-semibold text-gray-900">Stuck in Submitted</div>
+                                                <div class="text-xs text-gray-500">Waiting TR8 issuance</div>
+                                            </div>
+                                            <div class="inline-flex items-center gap-3">
+                                                <span class="rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900 border border-amber-200">{{ $attStuckSubmitted }}</span>
+                                                <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
 
-                                        <a href="{{ $makeUrl(['status' => 'tr8_issued', '__att' => 'stuck_tr8_issued']) }}#clearances"
-                                           class="group rounded-2xl border border-gray-200 bg-gray-50/60 p-3 hover:bg-gray-50 hover:border-gray-300 transition">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="min-w-0">
-                                                    <div class="text-[13px] font-semibold text-gray-900 leading-snug">TR8 issued, not arrived</div>
-                                                    <div class="text-[11px] text-gray-500 mt-1">TR8 done · chase truck/dispatch</div>
-                                                </div>
-                                                <div class="shrink-0 flex items-center gap-2">
-                                                    <span class="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-900 border border-blue-200">{{ $attStuckTr8 }}</span>
-                                                    <span class="text-gray-300 group-hover:text-gray-400">›</span>
-                                                </div>
+                                        <a href="{{ $makeFilterUrl(['status' => 'tr8_issued', '__att' => 'stuck_tr8_issued']) }}#clearances"
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-semibold text-gray-900">TR8 issued, not arrived</div>
+                                                <div class="text-xs text-gray-500">Chase truck / dispatch</div>
+                                            </div>
+                                            <div class="inline-flex items-center gap-3">
+                                                <span class="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-900 border border-blue-200">{{ $attStuckTr8 }}</span>
+                                                <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
 
-                                        <a href="{{ $makeUrl(['__att' => 'missing_tr8_number']) }}#clearances"
-                                           class="group rounded-2xl border border-gray-200 bg-gray-50/60 p-3 hover:bg-gray-50 hover:border-gray-300 transition">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="min-w-0">
-                                                    <div class="text-[13px] font-semibold text-gray-900 leading-snug">Missing TR8 number</div>
-                                                    <div class="text-[11px] text-gray-500 mt-1">Data risk · fix immediately</div>
-                                                </div>
-                                                <div class="shrink-0 flex items-center gap-2">
-                                                    <span class="rounded-full bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-900 border border-rose-200">{{ $attMissingTr8 }}</span>
-                                                    <span class="text-gray-300 group-hover:text-gray-400">›</span>
-                                                </div>
+                                        <a href="{{ $makeFilterUrl(['status' => 'tr8_issued', '__att' => 'missing_tr8_number']) }}#clearances"
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-semibold text-gray-900">Missing TR8 number</div>
+                                                <div class="text-xs text-gray-500">Data risk</div>
+                                            </div>
+                                            <div class="inline-flex items-center gap-3">
+                                                <span class="rounded-full bg-rose-50 px-2 py-1 text-xs font-bold text-rose-900 border border-rose-200">{{ $attMissingTr8 }}</span>
+                                                <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
 
-                                        <a href="{{ $makeUrl(['__att' => 'missing_documents']) }}#clearances"
-                                           class="group rounded-2xl border border-gray-200 bg-gray-50/60 p-3 hover:bg-gray-50 hover:border-gray-300 transition">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="min-w-0">
-                                                    <div class="text-[13px] font-semibold text-gray-900 leading-snug">Missing documents</div>
-                                                    <div class="text-[11px] text-gray-500 mt-1">Audit risk · upload supporting docs</div>
-                                                </div>
-                                                <div class="shrink-0 flex items-center gap-2">
-                                                    <span class="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-800 border border-gray-200">{{ $attMissingDocs }}</span>
-                                                    <span class="text-gray-300 group-hover:text-gray-400">›</span>
-                                                </div>
+                                        <a href="{{ $makeFilterUrl(['__att' => 'missing_documents']) }}#clearances"
+                                           class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-3 hover:bg-gray-50">
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-semibold text-gray-900">Missing documents</div>
+                                                <div class="text-xs text-gray-500">Audit risk</div>
+                                            </div>
+                                            <div class="inline-flex items-center gap-3">
+                                                <span class="rounded-full bg-gray-50 px-2 py-1 text-xs font-bold text-gray-800 border border-gray-200">{{ $attMissingDocs }}</span>
+                                                <span class="text-gray-300">›</span>
                                             </div>
                                         </a>
                                     </div>
@@ -218,49 +218,47 @@
                 </div>
 
                 {{-- STATUS PILLS --}}
-                @php
-                    $pillVal = function($key) use ($stats) {
-                        // show — when stats missing (prevents "0 0 0" confusion)
-                        return array_key_exists($key, $stats) && $stats[$key] !== null ? (int)$stats[$key] : '—';
-                    };
-                    $pill = function($label, $value, $href, $tone) {
-                        $base = "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:shadow-sm";
-                        $toneClass = match($tone) {
-                            'amber' => "border-amber-200 bg-amber-50 text-amber-900",
-                            'blue' => "border-blue-200 bg-blue-50 text-blue-900",
-                            'emerald' => "border-emerald-200 bg-emerald-50 text-emerald-900",
-                            'rose' => "border-rose-200 bg-rose-50 text-rose-900",
-                            default => "border-gray-200 bg-gray-50 text-gray-800",
-                        };
-                        return '<a href="'.$href.'" class="'.$base.' '.$toneClass.'"><span>'.$label.'</span><span class="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold border border-black/5">'.$value.'</span></a>';
-                    };
-                @endphp
-
                 <div class="mt-4 flex flex-wrap items-center gap-2">
-                    {!! $pill('Total', $pillVal('total'), $makeUrl(['status' => null]), 'gray') !!}
-                    {!! $pill('Draft', $pillVal('draft'), $makeUrl(['status' => 'draft']), 'gray') !!}
-                    {!! $pill('Submitted', $pillVal('submitted'), $makeUrl(['status' => 'submitted']), 'amber') !!}
-                    {!! $pill('TR8 Issued', $pillVal('tr8_issued'), $makeUrl(['status' => 'tr8_issued']), 'blue') !!}
-                    {!! $pill('Arrived', $pillVal('arrived'), $makeUrl(['status' => 'arrived']), 'emerald') !!}
-                    {!! $pill('Cancelled', $pillVal('cancelled'), $makeUrl(['status' => 'cancelled']), 'rose') !!}
+                    @php
+                        $pill = function($label, $count, $key, $tone) use ($makeFilterUrl) {
+                            $href = $makeFilterUrl(['status' => $key]);
+                            $base = "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold";
+                            $toneClass = match($tone) {
+                                'amber' => "border-amber-200 bg-amber-50 text-amber-900",
+                                'blue' => "border-blue-200 bg-blue-50 text-blue-900",
+                                'emerald' => "border-emerald-200 bg-emerald-50 text-emerald-900",
+                                'rose' => "border-rose-200 bg-rose-50 text-rose-900",
+                                default => "border-gray-200 bg-gray-50 text-gray-800",
+                            };
+                            $countPill = "<span class='inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold border border-black/5'>{$count}</span>";
+                            return "<a href='{$href}' class='{$base} {$toneClass} hover:shadow-sm transition'><span>{$label}</span>{$countPill}</a>";
+                        };
+                    @endphp
+
+                    {!! $pill('Total', (int)$stats['total'], '', 'gray') !!}
+                    {!! $pill('Draft', (int)$stats['draft'], 'draft', 'gray') !!}
+                    {!! $pill('Submitted', (int)$stats['submitted'], 'submitted', 'amber') !!}
+                    {!! $pill('TR8 Issued', (int)$stats['tr8_issued'], 'tr8_issued', 'blue') !!}
+                    {!! $pill('Arrived', (int)$stats['arrived'], 'arrived', 'emerald') !!}
+                    {!! $pill('Cancelled', (int)$stats['cancelled'], 'cancelled', 'rose') !!}
                 </div>
 
-                {{-- FILTERS (compact, one-line on desktop; wraps on small screens) --}}
-                <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
-                    <div class="flex flex-wrap items-end gap-3">
-                        <div class="w-full sm:w-56">
+                {{-- FILTERS: ONE LINE ON DESKTOP, STACK ON MOBILE --}}
+                <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
+                    <div class="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-end lg:gap-2">
+                        <div class="w-full lg:w-[14rem]">
                             <label class="text-[11px] font-semibold text-gray-600">Client</label>
-                            <select name="client_id" class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
-                                <option value="">All clients</option>
+                            <select name="client_id" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
+                                <option value="">All</option>
                                 @foreach($clients as $c)
                                     <option value="{{ $c->id }}" @selected((string)$fClient === (string)$c->id)>{{ $c->name }}</option>
                                 @endforeach
                             </select>
                         </div>
 
-                        <div class="w-full sm:w-44">
+                        <div class="w-full lg:w-[10rem]">
                             <label class="text-[11px] font-semibold text-gray-600">Status</label>
-                            <select name="status" class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
+                            <select name="status" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
                                 <option value="">All</option>
                                 <option value="draft" @selected($fStatus==='draft')>Draft</option>
                                 <option value="submitted" @selected($fStatus==='submitted')>Submitted</option>
@@ -270,32 +268,27 @@
                             </select>
                         </div>
 
-                        <div class="flex-1 min-w-[16rem]">
+                        <div class="w-full lg:flex-1 lg:min-w-[16rem]">
                             <label class="text-[11px] font-semibold text-gray-600">Search</label>
-                            <input name="q" value="{{ $fSearch }}"
-                                   placeholder="Truck, trailer, TR8, invoice, border..."
-                                   class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10" />
+                            <input name="q" value="{{ $fSearch }}" placeholder="Truck, trailer, TR8, invoice…" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
                         </div>
 
-                        <div class="w-full sm:w-40">
-                            <label class="text-[11px] font-semibold text-gray-600">From</label>
-                            <input type="date" name="from" value="{{ $fFrom }}"
-                                   class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10" />
+                        <div class="w-full sm:flex sm:gap-2 lg:w-auto lg:flex lg:gap-2">
+                            <div class="flex-1 lg:w-[10.5rem]">
+                                <label class="text-[11px] font-semibold text-gray-600">From</label>
+                                <input type="date" name="from" value="{{ $fFrom }}" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
+                            </div>
+                            <div class="flex-1 lg:w-[10.5rem]">
+                                <label class="text-[11px] font-semibold text-gray-600">To</label>
+                                <input type="date" name="to" value="{{ $fTo }}" class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
+                            </div>
                         </div>
 
-                        <div class="w-full sm:w-40">
-                            <label class="text-[11px] font-semibold text-gray-600">To</label>
-                            <input type="date" name="to" value="{{ $fTo }}"
-                                   class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10" />
-                        </div>
-
-                        <div class="ml-auto flex items-center gap-2">
-                            <a href="{{ url()->current() }}"
-                               class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">
+                        <div class="w-full lg:w-auto lg:ml-auto flex items-center justify-end gap-2 pt-1">
+                            <a href="{{ url()->current() }}" class="h-9 inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
                                 Reset
                             </a>
-                            <button type="submit"
-                                    class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
+                            <button type="submit" class="h-9 inline-flex items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
                                 Apply
                             </button>
                         </div>
@@ -306,38 +299,36 @@
                 <div id="clearances" class="mt-5 flex items-center justify-between gap-3">
                     <div>
                         <div class="text-sm font-semibold text-gray-900">Clearances</div>
-                        <div class="text-xs text-gray-500">Row click opens the record. Buttons handle workflow.</div>
+                        <div class="text-xs text-gray-500">Row click opens record. Actions update workflow.</div>
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <button type="button"
-                                id="btnExportXlsx"
-                                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">
+                        <button type="button" class="h-9 inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50" id="btnExportXlsx">
                             Export Excel
                         </button>
-                        <button type="button"
-                                id="btnExportPdf"
-                                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">
+                        <button type="button" class="h-9 inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50" id="btnExportPdf">
                             Export PDF
                         </button>
                     </div>
                 </div>
 
-                {{-- Tabulator container --}}
+                {{-- TABULATOR --}}
                 <div class="mt-3 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                    <div class="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
-                        <div class="text-xs text-gray-500">
-                            Table view
-                        </div>
-                        <div class="text-xs text-gray-400">
-                            Tip: click row to open
-                        </div>
+                    <div class="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                        <div class="text-xs text-gray-500">Tip: use filters above + click a row</div>
+                        <div class="text-xs text-gray-400">Remote pagination enabled</div>
                     </div>
 
-                    <div class="p-3 bg-white">
+                    <div class="p-3">
                         <div id="clearancesTable"></div>
                     </div>
                 </div>
+
+                @if($clearances && method_exists($clearances, 'links'))
+                    <div class="mt-4">
+                        {{ $clearances->withQueryString()->links() }}
+                    </div>
+                @endif
 
             </div>
         </div>
@@ -349,317 +340,258 @@
     @include('depot-stock::compliance.clearances._create_modal', ['clients' => $clients])
 @endif
 
-{{-- Confirm modal (reusable) --}}
-<div id="confirmModal" class="hidden fixed inset-0 z-50 items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/35" data-confirm-cancel="1"></div>
-
-    <div class="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-100">
-            <div class="text-sm font-semibold text-gray-900" id="confirmTitle">Confirm</div>
-            <div class="text-xs text-gray-500 mt-1" id="confirmText">Are you sure?</div>
+{{-- Confirm modal (generic) --}}
+<div id="confirmModal" class="hidden fixed inset-0 z-50 items-center justify-center">
+    <div class="absolute inset-0 bg-black/30" data-modal-backdrop="confirm"></div>
+    <div class="relative w-[min(32rem,calc(100vw-1rem))] rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div id="confirmTitle" class="text-sm font-semibold text-gray-900">Confirm</div>
+            <button class="rounded-lg px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50" data-modal-close="confirm">Close</button>
         </div>
-
-        <div class="px-5 py-4 flex items-center justify-end gap-2">
-            <button type="button" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50" data-confirm-cancel="1">
-                Cancel
-            </button>
-            <button type="button" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800" id="confirmOk">
-                Confirm
-            </button>
-        </div>
-    </div>
-</div>
-
-{{-- Issue TR8 modal --}}
-<div id="issueTr8Modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/35" data-issue-close="1"></div>
-
-    <div class="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-                <div class="text-sm font-semibold text-gray-900">Issue TR8</div>
-                <div class="text-xs text-gray-500 mt-1">Add TR8 number (and optionally attach a document).</div>
-            </div>
-            <button type="button" class="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50" data-issue-close="1">
-                Close
-            </button>
-        </div>
-
-        <form id="issueTr8Form" class="p-5">
-            <input type="hidden" id="issueTr8ClearanceId" value="" />
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="text-[11px] font-semibold text-gray-600">TR8 number</label>
-                    <input id="issueTr8Number" required
-                           class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"
-                           placeholder="e.g. TR8-000123" />
-                </div>
-                <div>
-                    <label class="text-[11px] font-semibold text-gray-600">Reference (optional)</label>
-                    <input id="issueTr8Ref"
-                           class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"
-                           placeholder="Agent / border ref" />
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="text-[11px] font-semibold text-gray-600">Attach document (optional)</label>
-                    <input id="issueTr8Doc" type="file"
-                           class="mt-1 w-full rounded-xl border border-gray-200 bg-white text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-gray-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-gray-800" />
-                    <div class="text-[11px] text-gray-500 mt-1">PDF/JPG/PNG recommended.</div>
-                </div>
-            </div>
-
-            <div class="mt-5 flex items-center justify-end gap-2">
-                <button type="button" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50" data-issue-close="1">
+        <div class="p-4">
+            <div id="confirmText" class="text-sm text-gray-700">Are you sure?</div>
+            <div class="mt-4 flex items-center justify-end gap-2">
+                <button class="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50" data-modal-close="confirm">
                     Cancel
                 </button>
-                <button type="submit" class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800">
-                    Save TR8
+                <button id="confirmOk" class="h-9 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white hover:bg-gray-800">
+                    Confirm
                 </button>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 @endsection
 
 @push('styles')
 <style>
-    /* Tabulator polish (header bg different from light grey + status styling) */
+    /* Tabulator polish */
     #clearancesTable .tabulator{
         border: 0;
-        border-radius: 16px;
+        border-radius: 14px;
         overflow: hidden;
+        background: white;
     }
     #clearancesTable .tabulator-header{
-        background: rgba(17,24,39,.04); /* richer than default grey */
-        border-bottom: 1px solid rgba(0,0,0,.06);
+        background: #0f172a; /* slate-900 */
+        color: white;
+        border-bottom: 0;
     }
-    #clearancesTable .tabulator-col{
+    #clearancesTable .tabulator-header .tabulator-col{
         background: transparent;
+        border-right: 0;
+    }
+    #clearancesTable .tabulator-col-title{
+        font-weight: 700;
+        letter-spacing: .04em;
+        font-size: 11px;
     }
     #clearancesTable .tabulator-row{
         border-bottom: 1px solid rgba(0,0,0,.04);
     }
     #clearancesTable .tabulator-row:hover{
-        background: rgba(17,24,39,.03);
+        background: rgba(2,6,23,.03);
     }
-    #clearancesTable .tabulator-cell{
-        padding-top: 12px;
-        padding-bottom: 12px;
-    }
-    .status-pill{
-        display:inline-flex;
-        align-items:center;
-        gap:.4rem;
-        padding:.2rem .6rem;
-        border-radius:999px;
-        border:1px solid rgba(0,0,0,.08);
-        font-size:12px;
-        font-weight:700;
-        white-space:nowrap;
-    }
-    .row-draft      { background: rgba(107,114,128,.06); }
-    .row-submitted  { background: rgba(245,158,11,.06); }
-    .row-tr8_issued { background: rgba(59,130,246,.06); }
-    .row-arrived    { background: rgba(16,185,129,.06); }
-    .row-cancelled  { background: rgba(244,63,94,.06); }
 </style>
 @endpush
 
 @push('scripts')
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    // 1) Ensure Tabulator exists
+document.addEventListener("DOMContentLoaded", function(){
+    // --- Guards
     if (!window.Tabulator) {
-        console.error("Tabulator not found on window.");
+        console.error("Tabulator missing on window. Ensure it is loaded in Vite app.js and @stack('scripts') exists in layout.");
         return;
     }
 
-    var csrf = @json(csrf_token());
-    var canAct = @json((bool)$canAct);
+    const csrf = @json(csrf_token());
+    const canAct = @json($canAct);
+    const baseUrl = @json(url('depot/compliance/clearances'));
+    const dataUrl = @json(route('depot.compliance.clearances.data'));
 
-    // 2) Routes as BASE strings (avoid Blade inside template literals)
-    var baseShow   = @json(url('depot/compliance/clearances'));
-    var dataUrl    = @json(route('depot.compliance.clearances.data'));
+    // --- Modal helpers (close on backdrop / esc)
+    const openFlex = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+    };
+    const closeModal = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+    };
 
-    // 3) Confirm modal (reusable)
-    var confirmModal = document.getElementById("confirmModal");
-    var confirmTitle = document.getElementById("confirmTitle");
-    var confirmText  = document.getElementById("confirmText");
-    var confirmOk    = document.getElementById("confirmOk");
-    var confirmResolver = null;
+    document.addEventListener('click', (e) => {
+        const bd = e.target.closest('[data-modal-backdrop]');
+        if (bd) {
+            closeModal(bd.getAttribute('data-modal-backdrop') === 'confirm' ? 'confirmModal' : bd.getAttribute('data-modal-backdrop'));
+        }
+        const cl = e.target.closest('[data-modal-close]');
+        if (cl) {
+            const which = cl.getAttribute('data-modal-close');
+            if (which === 'confirm') closeModal('confirmModal');
+        }
+    });
 
-    function openConfirm(title, text) {
-        confirmTitle.textContent = title || "Confirm";
-        confirmText.textContent  = text || "Are you sure?";
-        confirmModal.classList.remove("hidden");
-        confirmModal.classList.add("flex");
-        return new Promise(function(resolve){
-            confirmResolver = resolve;
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal('confirmModal');
+            // create modal id is inside include; if yours is "createClearanceModal" this will close it too:
+            const cm = document.getElementById('createClearanceModal');
+            if (cm && !cm.classList.contains('hidden')) closeModal('createClearanceModal');
+            // attention panel:
+            closeAttention();
+        }
+    });
+
+    // --- Confirm modal API
+    let confirmResolver = null;
+    function confirmUI({title="Confirm", text="Are you sure?"}){
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmText').textContent = text;
+        openFlex('confirmModal');
+        return new Promise((resolve) => { confirmResolver = resolve; });
+    }
+    document.getElementById('confirmOk').addEventListener('click', () => {
+        closeModal('confirmModal');
+        if (confirmResolver) { confirmResolver(true); confirmResolver = null; }
+    });
+    document.querySelectorAll('[data-modal-close="confirm"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            closeModal('confirmModal');
+            if (confirmResolver) { confirmResolver(false); confirmResolver = null; }
         });
-    }
-    function closeConfirm(val){
-        confirmModal.classList.add("hidden");
-        confirmModal.classList.remove("flex");
-        var r = confirmResolver;
-        confirmResolver = null;
-        if (r) r(val);
-    }
-    document.querySelectorAll("[data-confirm-cancel]").forEach(function(el){
-        el.addEventListener("click", function(){ closeConfirm(false); });
-    });
-    confirmOk.addEventListener("click", function(){ closeConfirm(true); });
-
-    // 4) Issue TR8 modal
-    var issueModal = document.getElementById("issueTr8Modal");
-    var issueForm  = document.getElementById("issueTr8Form");
-    var issueIdEl  = document.getElementById("issueTr8ClearanceId");
-    var issueNumEl = document.getElementById("issueTr8Number");
-    var issueRefEl = document.getElementById("issueTr8Ref");
-    var issueDocEl = document.getElementById("issueTr8Doc");
-
-    function openIssueModal(clearanceId){
-        issueIdEl.value = String(clearanceId || "");
-        issueNumEl.value = "";
-        issueRefEl.value = "";
-        if (issueDocEl) issueDocEl.value = "";
-        issueModal.classList.remove("hidden");
-        issueModal.classList.add("flex");
-        setTimeout(function(){ issueNumEl.focus(); }, 50);
-    }
-    function closeIssueModal(){
-        issueModal.classList.add("hidden");
-        issueModal.classList.remove("flex");
-    }
-    document.querySelectorAll("[data-issue-close]").forEach(function(el){
-        el.addEventListener("click", function(){ closeIssueModal(); });
     });
 
-    // 5) Attention panel toggle
-    var attBtn   = document.getElementById("btnAttention");
-    var attPanel = document.getElementById("attentionPanel");
-    var attWrap  = document.getElementById("attWrap");
+    // --- Attention panel toggle (responsive)
+    const attBtn = document.getElementById("btnAttention");
+    const attPanel = document.getElementById("attentionPanel");
+    const attWrap = document.getElementById("attWrap");
 
     function closeAttention(){
         if (!attPanel) return;
         attPanel.classList.add("hidden");
-        if (attBtn) attBtn.setAttribute("aria-expanded", "false");
+        attBtn?.setAttribute("aria-expanded","false");
     }
     function openAttention(){
         if (!attPanel) return;
         attPanel.classList.remove("hidden");
-        if (attBtn) attBtn.setAttribute("aria-expanded", "true");
+        attBtn?.setAttribute("aria-expanded","true");
+
+        // Ensure it never falls off screen left
+        const rect = attPanel.getBoundingClientRect();
+        if (rect.left < 8) {
+            attPanel.style.left = '0.5rem';
+            attPanel.style.right = 'auto';
+        } else {
+            attPanel.style.left = '';
+            attPanel.style.right = '0';
+        }
     }
-    if (attBtn) {
-        attBtn.addEventListener("click", function(){
-            if (!attPanel) return;
-            var isOpen = !attPanel.classList.contains("hidden");
-            if (isOpen) closeAttention(); else openAttention();
-        });
-    }
+
+    attBtn?.addEventListener("click", function(){
+        if (!attPanel) return;
+        const isOpen = !attPanel.classList.contains("hidden");
+        isOpen ? closeAttention() : openAttention();
+    });
+
     document.addEventListener("click", function(e){
         if (!attWrap || !attPanel) return;
-        if (e.target && e.target.closest && e.target.closest("[data-att-close]")) {
-            closeAttention();
-            return;
-        }
+        if (e.target.closest("[data-att-close]")) { closeAttention(); return; }
         if (!attWrap.contains(e.target)) closeAttention();
     });
 
-    // 6) POST helper (JSON)
-    async function postJson(url, payload) {
-        var res = await fetch(url, {
+    // --- URL builders (so actions NEVER depend on server-provided urls)
+    const showUrl   = (id) => `${baseUrl}/${id}`;
+    const submitUrl = (id) => `${baseUrl}/${id}/submit`;
+    const issueUrl  = (id) => `${baseUrl}/${id}/issue-tr8`;
+    const arriveUrl = (id) => `${baseUrl}/${id}/arrive`;
+    const cancelUrl = (id) => `${baseUrl}/${id}/cancel`;
+
+    // --- POST helper
+    async function postJson(url, payload={}){
+        const res = await fetch(url, {
             method: "POST",
             headers: {
-                "Accept": "application/json",
                 "Content-Type": "application/json",
-                "X-CSRF-TOKEN": csrf
-            },
-            body: JSON.stringify(payload || {})
-        });
-        if (!res.ok) {
-            var txt = await res.text();
-            throw new Error(txt || "Request failed");
-        }
-        return true;
-    }
-
-    // 7) POST helper (multipart) for issue TR8 + file
-    async function postMultipart(url, formData) {
-        var res = await fetch(url, {
-            method: "POST",
-            headers: {
                 "Accept": "application/json",
                 "X-CSRF-TOKEN": csrf
             },
-            body: formData
+            body: JSON.stringify(payload)
         });
         if (!res.ok) {
-            var txt = await res.text();
-            throw new Error(txt || "Request failed");
+            const text = await res.text();
+            throw new Error(text || "Request failed");
         }
         return true;
     }
 
-    // 8) Tabulator (REMOTE) – matches your controller: {data:[], meta:{current_page,last_page,per_page,total}}
-    function statusRowClass(status){
-        switch(String(status || "")){
-            case "submitted":  return "row-submitted";
-            case "tr8_issued": return "row-tr8_issued";
-            case "arrived":    return "row-arrived";
-            case "cancelled":  return "row-cancelled";
-            default:           return "row-draft";
-        }
-    }
-    function statusPill(status){
-        var s = String(status || "");
-        var label = s.replace(/_/g, " ").toUpperCase() || "-";
-        var tone = "background: rgba(17,24,39,.04); color:#111827;";
-        if (s === "submitted") tone = "background: rgba(245,158,11,.15); color:#7a4b00;";
-        if (s === "tr8_issued") tone = "background: rgba(59,130,246,.15); color:#0b3b86;";
-        if (s === "arrived") tone = "background: rgba(16,185,129,.15); color:#065f46;";
-        if (s === "cancelled") tone = "background: rgba(244,63,94,.15); color:#9f1239;";
-        return '<span class="status-pill" style="'+tone+'">'+label+'</span>';
-    }
-
-    var table = new Tabulator("#clearancesTable", {
+    // --- Tabulator setup (REMOTE pagination + reshape response)
+    const table = new Tabulator("#clearancesTable", {
         layout: "fitColumns",
+        responsiveLayout: "collapse",
         height: "560px",
         placeholder: "No clearances found for this filter.",
         pagination: true,
         paginationMode: "remote",
         paginationSize: 20,
         ajaxURL: dataUrl,
-        ajaxParams: function(){
-            // send current query string filters to server
-            var p = Object.fromEntries(new URLSearchParams(window.location.search).entries());
-            return p;
+        ajaxParams: () => Object.fromEntries(new URLSearchParams(window.location.search).entries()),
+
+        // THIS is the key fix: reshape your controller response to Tabulator’s expected shape
+        ajaxResponse: function(url, params, resp){
+            // resp is: {data: [...], meta: {...}}
+            const shaped = {
+                data: Array.isArray(resp?.data) ? resp.data : [],
+                current_page: resp?.meta?.current_page ?? 1,
+                last_page: resp?.meta?.last_page ?? 1,
+                per_page: resp?.meta?.per_page ?? 20,
+                total: resp?.meta?.total ?? (Array.isArray(resp?.data) ? resp.data.length : 0),
+            };
+            console.log("Tabulator shaped response:", shaped);
+            return shaped;
         },
-        ajaxResponse: function(url, params, response){
-            // response is {data:[], meta:{}}
-            if (!response || !response.data) return [];
-            // store meta for remote pagination mapping
-            table.setMaxPage(Number(response.meta && response.meta.last_page ? response.meta.last_page : 1));
-            return response.data;
+
+        paginationDataReceived: {
+            "last_page":"last_page",
+            "data":"data",
+            "current_page":"current_page",
+            "total":"total"
         },
-        rowFormatter: function(row){
-            var d = row.getData() || {};
-            row.getElement().classList.add(statusRowClass(d.status));
+
+        rowClick: function(e, row){
+            // Click on action buttons shouldn't navigate
+            if (e.target.closest("button")) return;
+            const id = row.getData().id;
+            if (id) window.location.href = showUrl(id);
         },
+
         columns: [
-            { title: "STATUS", field: "status", width: 140, headerSort: false, formatter: function(cell){ return statusPill(cell.getValue()); } },
-            { title: "CLIENT", field: "client_name", minWidth: 180 },
-            { title: "TRUCK", field: "truck_number", width: 130 },
-            { title: "TRAILER", field: "trailer_number", width: 140 },
-            { title: "LOADED @20C", field: "loaded_20_l", width: 140, hozAlign:"right",
-              formatter: function(cell){
-                var v = cell.getValue();
-                if (v === null || v === undefined || v === "") return "-";
-                try { return Number(v).toLocaleString(); } catch(e){ return v; }
-              }
+            {
+                title: "STATUS",
+                field: "status",
+                width: 160,
+                formatter: (cell) => {
+                    const s = (cell.getValue() || "").toString();
+                    const label = s.replaceAll("_"," ").toUpperCase();
+                    const cls = ({
+                        draft: "border-gray-200 bg-gray-50 text-gray-900",
+                        submitted: "border-amber-200 bg-amber-50 text-amber-900",
+                        tr8_issued: "border-blue-200 bg-blue-50 text-blue-900",
+                        arrived: "border-emerald-200 bg-emerald-50 text-emerald-900",
+                        cancelled: "border-rose-200 bg-rose-50 text-rose-900",
+                    })[s] || "border-gray-200 bg-gray-50 text-gray-900";
+                    return `<span class="inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${cls}">${label || '-'}</span>`;
+                }
             },
+            { title: "CLIENT", field: "client_name", minWidth: 180 },
+            { title: "TRUCK", field: "truck_number", width: 140 },
+            { title: "TRAILER", field: "trailer_number", width: 150 },
+            { title: "LOADED @20°C", field: "loaded_20_l", hozAlign:"right", width: 150 },
             { title: "TR8", field: "tr8_number", width: 140 },
-            { title: "BORDER", field: "border_point", width: 160 },
+            { title: "BORDER", field: "border_point", width: 150 },
             { title: "SUBMITTED", field: "submitted_at", width: 170 },
             { title: "ISSUED", field: "tr8_issued_at", width: 170 },
             { title: "UPDATED BY", field: "updated_by_name", width: 170 },
@@ -667,134 +599,123 @@ document.addEventListener("DOMContentLoaded", function () {
             {
                 title: "ACTIONS",
                 field: "id",
-                minWidth: 270,
                 headerSort: false,
-                formatter: function(cell){
-                    var row = cell.getRow().getData();
-                    if (!row || !row.id) return "";
-                    if (!canAct) return "";
-                    var s = String(row.status || "");
-                    var html = '<div class="flex flex-wrap items-center gap-2 justify-end">';
-                    if (s === "draft") {
-                        html += '<button type="button" class="px-3 py-1.5 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800" data-action="submit" data-id="'+row.id+'">Submit</button>';
-                        html += '<button type="button" class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-xs font-semibold hover:bg-rose-100" data-action="cancel" data-id="'+row.id+'">Cancel</button>';
-                    } else if (s === "submitted") {
-                        html += '<button type="button" class="px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-xs font-semibold hover:bg-amber-100" data-action="issue_tr8" data-id="'+row.id+'">Issue TR8</button>';
-                        html += '<button type="button" class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-xs font-semibold hover:bg-rose-100" data-action="cancel" data-id="'+row.id+'">Cancel</button>';
-                    } else if (s === "tr8_issued") {
-                        html += '<button type="button" class="px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-xs font-semibold hover:bg-emerald-100" data-action="arrive" data-id="'+row.id+'">Mark arrived</button>';
-                        html += '<button type="button" class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-xs font-semibold hover:bg-rose-100" data-action="cancel" data-id="'+row.id+'">Cancel</button>';
+                minWidth: 320,
+                formatter: (cell) => {
+                    const data = cell.getRow().getData();
+                    const id = data.id;
+                    const s  = data.status;
+
+                    const btn = (label, action, tone="gray") => {
+                        const toneClass = ({
+                            gray: "border-gray-200 hover:bg-gray-50 text-gray-800",
+                            dark: "border-gray-900 bg-gray-900 text-white hover:bg-gray-800",
+                            amber:"border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
+                            blue: "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
+                            rose: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
+                            emerald:"border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+                        })[tone] || "border-gray-200 hover:bg-gray-50 text-gray-800";
+
+                        return `<button type="button" class="px-3 py-1.5 rounded-xl border text-xs font-semibold ${toneClass}" data-action="${action}" data-id="${id}">${label}</button>`;
+                    };
+
+                    if (!canAct) return `<span class="text-xs text-gray-400">No actions</span>`;
+
+                    let html = `<div class="flex flex-wrap items-center gap-2">`;
+
+                    if (s === 'draft') html += btn("Submit", "submit", "dark");
+                    if (s === 'submitted') {
+                        html += btn("Issue TR8", "issue", "amber");
+                        html += btn("Cancel", "cancel", "rose");
                     }
-                    html += "</div>";
+                    if (s === 'tr8_issued') {
+                        html += btn("Mark arrived", "arrive", "emerald");
+                        html += btn("Cancel", "cancel", "rose");
+                    }
+                    if (s === 'arrived') {
+                        html += btn("Cancel", "cancel", "rose");
+                    }
+
+                    html += `</div>`;
                     return html;
                 }
-            }
+            },
         ],
-        rowClick: function(e, row){
-            // if user clicked a button in Actions, ignore row navigation
-            var t = e.target;
-            if (t && t.closest && t.closest("[data-action]")) return;
-            var d = row.getData();
-            if (!d || !d.id) return;
-            window.location.href = baseShow + "/" + d.id;
-        },
     });
 
-    // 9) Actions click handler (with modals)
+    // --- Action handler (with confirm modal)
     document.addEventListener("click", async function(e){
-        var btn = e.target && e.target.closest ? e.target.closest("[data-action]") : null;
+        const btn = e.target.closest("button[data-action][data-id]");
         if (!btn) return;
 
-        var action = btn.getAttribute("data-action");
-        var id = btn.getAttribute("data-id");
-        if (!action || !id) return;
+        const action = btn.getAttribute("data-action");
+        const id = btn.getAttribute("data-id");
 
         try {
             if (action === "submit") {
-                var ok = await openConfirm("Submit clearance", "This will move the clearance to SUBMITTED.");
+                const ok = await confirmUI({title:"Submit clearance", text:"Submit this clearance now?"});
                 if (!ok) return;
-                await postJson(baseShow + "/" + id + "/submit", {});
+                await postJson(submitUrl(id));
                 window.location.reload();
-                return;
             }
 
             if (action === "arrive") {
-                var ok2 = await openConfirm("Mark arrived", "This will mark the clearance as ARRIVED.");
-                if (!ok2) return;
-                await postJson(baseShow + "/" + id + "/arrive", {});
+                const ok = await confirmUI({title:"Mark arrived", text:"Mark this clearance as arrived?"});
+                if (!ok) return;
+                await postJson(arriveUrl(id));
                 window.location.reload();
-                return;
             }
 
             if (action === "cancel") {
-                var ok3 = await openConfirm("Cancel clearance", "This will move the clearance to CANCELLED.");
-                if (!ok3) return;
-                await postJson(baseShow + "/" + id + "/cancel", {});
+                const ok = await confirmUI({title:"Cancel clearance", text:"Cancel this clearance? This is a workflow action."});
+                if (!ok) return;
+                await postJson(cancelUrl(id));
                 window.location.reload();
-                return;
             }
 
-            if (action === "issue_tr8") {
-                openIssueModal(id);
-                return;
+            if (action === "issue") {
+                // v1: prompt (you said later you want a real modal with file upload)
+                const tr8 = prompt("Enter TR8 number:");
+                if (!tr8) return;
+                await postJson(issueUrl(id), { tr8_number: tr8 });
+                window.location.reload();
             }
-        } catch (err) {
+        } catch(err) {
+            alert(("Action failed:\n\n" + (err?.message || err)).slice(0, 500));
             console.error(err);
-            alert("Action failed. Check console/network.");
         }
     });
 
-    // 10) Issue TR8 submit
-    issueForm.addEventListener("submit", async function(e){
-        e.preventDefault();
+    // --- Exports (client-side on current page only; remote pagination means it exports current loaded set)
+    document.getElementById("btnExportXlsx")?.addEventListener("click", () => {
+        table.download("xlsx", "clearances.xlsx", {sheetName:"Clearances"});
+    });
+    document.getElementById("btnExportPdf")?.addEventListener("click", () => {
+        table.download("pdf", "clearances.pdf", {orientation:"landscape", title:"Clearances"});
+    });
 
-        var id = issueIdEl.value;
-        var tr8 = issueNumEl.value.trim();
-        var ref = issueRefEl.value.trim();
+    // --- Create modal open (your include uses createClearanceModal)
+    document.getElementById("btnOpenCreateClearance")?.addEventListener("click", () => {
+        const modal = document.getElementById("createClearanceModal");
+        if (!modal) return;
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+    });
 
-        if (!id || !tr8) return;
-
-        try {
-            var fd = new FormData();
-            fd.append("tr8_number", tr8);
-            if (ref) fd.append("tr8_reference", ref);
-            if (issueDocEl && issueDocEl.files && issueDocEl.files[0]) {
-                fd.append("tr8_document", issueDocEl.files[0]);
-            }
-
-            await postMultipart(baseShow + "/" + id + "/issue-tr8", fd);
-            closeIssueModal();
-            window.location.reload();
-        } catch (err) {
-            console.error(err);
-            alert("Failed to issue TR8. Check console/network.");
+    // --- Click outside close for create modal (if it has a backdrop)
+    document.addEventListener('click', (e) => {
+        const cm = document.getElementById("createClearanceModal");
+        if (!cm || cm.classList.contains("hidden")) return;
+        if (e.target === cm) { // if modal wrapper is backdrop
+            cm.classList.add("hidden");
+            cm.classList.remove("flex");
         }
     });
 
-    // 11) Exports (client-side) – current filtered page view
-    document.getElementById("btnExportXlsx") && document.getElementById("btnExportXlsx").addEventListener("click", function(){
-        table.download("xlsx", "clearances.xlsx", { sheetName: "Clearances" });
-    });
-
-    document.getElementById("btnExportPdf") && document.getElementById("btnExportPdf").addEventListener("click", function(){
-        table.download("pdf", "clearances.pdf", { orientation: "landscape", title: "Clearances" });
-    });
-
-    // 12) Create modal open (keeps your existing include)
-    var btnCreate = document.getElementById("btnOpenCreateClearance");
-    if (btnCreate) {
-        btnCreate.addEventListener("click", function(){
-            var modal = document.getElementById("createClearanceModal");
-            if (!modal) return;
-            modal.classList.remove("hidden");
-            modal.classList.add("flex");
-        });
-    }
-
-    // 13) Smooth scroll to table from attention links
+    // When coming from attention links, smooth scroll
     if (window.location.hash === "#clearances") {
-        var el = document.getElementById("clearances");
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        const el = document.getElementById("clearances");
+        if (el) el.scrollIntoView({behavior:"smooth", block:"start"});
     }
 });
 </script>
