@@ -1,9 +1,10 @@
+{{-- resources/views/vendor/depot-stock/compliance/clearances/index.blade.php --}}
 @extends('depot-stock::layouts.app')
 
 @section('content')
 @php
     // -------------------------------
-    // Safety defaults (avoid undefined)
+    // Safety defaults
     // -------------------------------
     $clients    = $clients ?? collect();
     $clearances = $clearances ?? null;
@@ -22,12 +23,12 @@
     ];
 
     // -------------------------------
-    // Role gating (MATCH app.blade.php style)
-    // Your User::hasRole expects STRING only — DO NOT pass arrays.
+    // Role gating (avoid User::hasRole signature mismatch)
     // -------------------------------
     $u = auth()->user();
-    $roleNames = $u?->roles?->pluck('name')->map(fn($r) => strtolower($r))->all() ?? [];
-    $canCreate = in_array('admin', $roleNames) || in_array('owner', $roleNames) || in_array('compliance', $roleNames);
+    $roleNames = $u?->roles?->pluck('name')->map(fn($r) => strtolower((string)$r))->all() ?? [];
+
+    $canCreate = in_array('admin', $roleNames, true) || in_array('owner', $roleNames, true) || in_array('compliance', $roleNames, true);
     $canAct    = $canCreate;
 
     // -------------------------------
@@ -40,8 +41,7 @@
     $fTo     = request('to');
 
     // -------------------------------
-    // Build table dataset (current page only)
-    // Exports respect current filters because rows are built from $items.
+    // Current page items (server-filtered)
     // -------------------------------
     $items = [];
     if ($clearances && method_exists($clearances, 'items')) {
@@ -60,14 +60,14 @@
 
     $now = now();
 
-    // Needs-attention totals
+    // Needs attention totals
     $attStuckSubmitted = (int)($stats['stuck_submitted'] ?? 0);
     $attStuckTr8       = (int)($stats['stuck_tr8_issued'] ?? 0);
     $attMissingTr8     = (int)($stats['missing_tr8_number'] ?? 0);
     $attMissingDocs    = (int)($stats['missing_documents'] ?? 0);
     $attTotal          = $attStuckSubmitted + $attStuckTr8 + $attMissingTr8 + $attMissingDocs;
 
-    // Helper: build URL preserving existing filters + override status
+    // Base query string (preserve user filters)
     $qsBase = array_filter([
         'client_id' => $fClient,
         'q'         => $fSearch,
@@ -78,8 +78,56 @@
     $makeFilterUrl = function(array $override = []) use ($qsBase) {
         $qs = array_merge($qsBase, $override);
         $qs = array_filter($qs, fn($v) => $v !== null && $v !== '');
-        $href = url()->current() . (count($qs) ? ('?' . http_build_query($qs)) : '');
-        return $href;
+        return url()->current() . (count($qs) ? ('?' . http_build_query($qs)) : '');
+    };
+
+    // Build JSON rows for Tabulator (CURRENT PAGE ONLY)
+    $rows = [];
+    foreach ($items as $c) {
+        $status = $c->status ?? 'draft';
+        $meta = $statusMeta[$status] ?? ['label' => ucfirst((string)$status)];
+
+        $rows[] = [
+            'id'           => $c->id,
+            'status'       => $status,
+            'status_label' => $meta['label'],
+            'client'       => $c->client->name ?? '-',
+            'truck'        => $c->truck_number ?? '-',
+            'trailer'      => $c->trailer_number ?? '-',
+            'loaded_20_l'  => $c->loaded_20_l ?? null,
+            'tr8_number'   => $c->tr8_number ?? null,
+            'border_point' => $c->border_point ?? null,
+            'invoice_number' => $c->invoice_number ?? null,
+            'submitted_at' => optional($c->submitted_at ?? null)?->toDateTimeString(),
+            'tr8_issued_at'=> optional($c->tr8_issued_at ?? null)?->toDateTimeString(),
+            'updated_by'   => $c->updatedBy->name ?? $c->updated_by_name ?? null,
+            'updated_at'   => optional($c->updated_at ?? null)?->toDateTimeString(),
+            'urls' => [
+                'show'      => route('depot.compliance.clearances.show', $c),
+                'submit'    => route('depot.compliance.clearances.submit', $c),
+                'issue_tr8' => route('depot.compliance.clearances.issue_tr8', $c),
+                'arrive'    => route('depot.compliance.clearances.arrive', $c),
+                'cancel'    => route('depot.compliance.clearances.cancel', $c),
+            ],
+        ];
+    }
+
+    $pill = function($label, $count, $tone = 'gray') {
+        $base = "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold";
+        $toneClass = match($tone) {
+            'amber'   => "border-amber-200 bg-amber-50 text-amber-900",
+            'blue'    => "border-blue-200 bg-blue-50 text-blue-900",
+            'emerald' => "border-emerald-200 bg-emerald-50 text-emerald-900",
+            'rose'    => "border-rose-200 bg-rose-50 text-rose-900",
+            default   => "border-gray-200 bg-gray-50 text-gray-800",
+        };
+        $count = (int)$count;
+        return <<<HTML
+            <div class="{$base} {$toneClass}">
+                <span>{$label}</span>
+                <span class="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold border border-black/5">{$count}</span>
+            </div>
+        HTML;
     };
 @endphp
 
@@ -88,7 +136,7 @@
         <div class="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div class="p-5 sm:p-6">
 
-                {{-- HEADER --}}
+                {{-- Header (compact ops) --}}
                 <div class="flex items-start justify-between gap-4">
                     <div class="min-w-0">
                         <div class="text-xs text-gray-500">Compliance</div>
@@ -105,6 +153,7 @@
                         </div>
                     </div>
 
+                    {{-- Actions (no squashing) --}}
                     <div class="flex items-center gap-2">
                         @if($canCreate)
                             <button
@@ -113,11 +162,11 @@
                                 id="btnOpenCreateClearance"
                             >
                                 <span class="text-base leading-none">+</span>
-                                <span class="hidden sm:inline">New</span>
+                                <span>New</span>
                             </button>
                         @endif
 
-                        {{-- Needs attention (icon button + badge + tooltip + anchored panel) --}}
+                        {{-- Attention button (notification style) --}}
                         <div class="relative" id="attWrap">
                             <button
                                 type="button"
@@ -127,11 +176,11 @@
                                 aria-expanded="false"
                                 title="Needs attention"
                             >
-                                {{-- bell/alert icon --}}
-                                <svg class="h-5 w-5 text-gray-700 group-hover:text-gray-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <svg class="h-5 w-5 text-gray-800 group-hover:text-gray-900" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                     <path d="M12 22a2.5 2.5 0 0 0 2.45-2H9.55A2.5 2.5 0 0 0 12 22Z" fill="currentColor" opacity=".9"/>
                                     <path d="M20 17H4c1.8-1.5 2.5-3.3 2.5-6V9.5C6.5 6.46 8.7 4 12 4s5.5 2.46 5.5 5.5V11c0 2.7.7 4.5 2.5 6Z"
-                                          stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                                          stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                    <path d="M18.7 7.2c.55.5.95 1.1 1.2 1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".65"/>
                                 </svg>
 
                                 @if($attTotal > 0)
@@ -141,10 +190,10 @@
                                 @endif
                             </button>
 
-                            {{-- Attention panel (anchored, modern, not huge) --}}
+                            {{-- Anchored panel (wider, no fluff) --}}
                             <div
                                 id="attentionPanel"
-                                class="hidden absolute right-0 mt-2 w-[22rem] sm:w-[26rem] rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden z-40"
+                                class="hidden absolute right-0 mt-2 w-[24rem] sm:w-[28rem] rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden z-40"
                             >
                                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                                     <div class="text-sm font-semibold text-gray-900">Needs attention</div>
@@ -154,7 +203,6 @@
                                 </div>
 
                                 <div class="p-2">
-                                    {{-- compact list like notifications --}}
                                     <a href="{{ $makeFilterUrl(['status' => 'submitted', '__att' => 'stuck_submitted']) }}#clearances"
                                        class="flex items-center justify-between rounded-xl px-3 py-2 hover:bg-gray-50">
                                         <div class="min-w-0">
@@ -208,43 +256,23 @@
                     </div>
                 </div>
 
-                {{-- STATUS PILLS (keep simple) --}}
+                {{-- Status pills (simple, informational) --}}
                 <div class="mt-4 flex flex-wrap items-center gap-2">
-                    @php
-                        $pill = function($label, $count, $key, $tone) use ($makeFilterUrl) {
-                            $href = $makeFilterUrl(['status' => $key]);
-                            $base = "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold";
-                            $toneClass = match($tone) {
-                                'amber' => "border-amber-200 bg-amber-50 text-amber-900",
-                                'blue' => "border-blue-200 bg-blue-50 text-blue-900",
-                                'emerald' => "border-emerald-200 bg-emerald-50 text-emerald-900",
-                                'rose' => "border-rose-200 bg-rose-50 text-rose-900",
-                                default => "border-gray-200 bg-gray-50 text-gray-800",
-                            };
-                            return <<<HTML
-                                <a href="{$href}" class="{$base} {$toneClass} hover:shadow-sm transition">
-                                    <span>{$label}</span>
-                                    <span class="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold border border-black/5">{$count}</span>
-                                </a>
-                            HTML;
-                        };
-                    @endphp
-
-                    {!! $pill('Total', (int)($stats['total'] ?? 0), '', 'gray') !!}
-                    {!! $pill('Draft', (int)($stats['draft'] ?? 0), 'draft', 'gray') !!}
-                    {!! $pill('Submitted', (int)($stats['submitted'] ?? 0), 'submitted', 'amber') !!}
-                    {!! $pill('TR8 Issued', (int)($stats['tr8_issued'] ?? 0), 'tr8_issued', 'blue') !!}
-                    {!! $pill('Arrived', (int)($stats['arrived'] ?? 0), 'arrived', 'emerald') !!}
-                    {!! $pill('Cancelled', (int)($stats['cancelled'] ?? 0), 'cancelled', 'rose') !!}
+                    {!! $pill('Total', (int)($stats['total'] ?? 0), 'gray') !!}
+                    {!! $pill('Draft', (int)($stats['draft'] ?? 0), 'gray') !!}
+                    {!! $pill('Submitted', (int)($stats['submitted'] ?? 0), 'amber') !!}
+                    {!! $pill('TR8 Issued', (int)($stats['tr8_issued'] ?? 0), 'blue') !!}
+                    {!! $pill('Arrived', (int)($stats['arrived'] ?? 0), 'emerald') !!}
+                    {!! $pill('Cancelled', (int)($stats['cancelled'] ?? 0), 'rose') !!}
                 </div>
 
-                {{-- FILTERS (compact operations style) --}}
-                <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
+                {{-- Filters (compact) --}}
+                <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
                         <div class="lg:col-span-3">
                             <label class="text-[11px] font-semibold text-gray-600">Client</label>
                             <select name="client_id"
-                                class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
+                                    class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
                                 <option value="">All clients</option>
                                 @foreach($clients as $c)
                                     <option value="{{ $c->id }}" @selected((string)$fClient === (string)$c->id)>{{ $c->name }}</option>
@@ -255,7 +283,7 @@
                         <div class="lg:col-span-2">
                             <label class="text-[11px] font-semibold text-gray-600">Status</label>
                             <select name="status"
-                                class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
+                                    class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
                                 <option value="">All</option>
                                 <option value="draft" @selected($fStatus==='draft')>Draft</option>
                                 <option value="submitted" @selected($fStatus==='submitted')>Submitted</option>
@@ -267,32 +295,21 @@
 
                         <div class="lg:col-span-4">
                             <label class="text-[11px] font-semibold text-gray-600">Search</label>
-                            <input
-                                name="q"
-                                value="{{ $fSearch }}"
-                                placeholder="Truck, trailer, TR8, invoice, border…"
-                                class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"
-                            />
+                            <input name="q" value="{{ $fSearch }}"
+                                   placeholder="Truck, trailer, TR8, invoice, border…"
+                                   class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10" />
                         </div>
 
                         <div class="lg:col-span-3 grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-[11px] font-semibold text-gray-600">From</label>
-                                <input
-                                    type="date"
-                                    name="from"
-                                    value="{{ $fFrom }}"
-                                    class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"
-                                />
+                                <input type="date" name="from" value="{{ $fFrom }}"
+                                       class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10" />
                             </div>
                             <div>
                                 <label class="text-[11px] font-semibold text-gray-600">To</label>
-                                <input
-                                    type="date"
-                                    name="to"
-                                    value="{{ $fTo }}"
-                                    class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"
-                                />
+                                <input type="date" name="to" value="{{ $fTo }}"
+                                       class="mt-1 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10" />
                             </div>
                         </div>
 
@@ -302,29 +319,29 @@
                                 Reset
                             </a>
                             <button type="submit"
-                                class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
+                                    class="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
                                 Apply
                             </button>
                         </div>
                     </div>
                 </form>
 
-                {{-- LIST HEADER + COMPACT EXPORTS (ONLY HERE; respects current filters) --}}
+                {{-- Table header + compact exports (ONLY PLACE exports live) --}}
                 <div id="clearances" class="mt-5 flex items-center justify-between gap-3">
                     <div>
                         <div class="text-sm font-semibold text-gray-900">Clearances</div>
-                        <div class="text-xs text-gray-500">Table is the workspace. Use actions for workflow.</div>
+                        <div class="text-xs text-gray-500">Table is the workspace. Exports follow current filters (this page).</div>
                     </div>
 
                     <div class="flex items-center gap-2">
                         <button type="button"
-                            class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-                            id="btnExportXlsx">
+                                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                                id="btnExportXlsx">
                             Export Excel
                         </button>
                         <button type="button"
-                            class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-                            id="btnExportPdf">
+                                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                                id="btnExportPdf">
                             Export PDF
                         </button>
                     </div>
@@ -336,9 +353,7 @@
                         <div class="text-xs text-gray-500">
                             Showing <span class="font-semibold text-gray-700">{{ count($items) }}</span> row(s) on this page
                         </div>
-                        <div class="text-xs text-gray-400">
-                            Tip: click row to open
-                        </div>
+                        <div class="text-xs text-gray-400">Tip: click row to open</div>
                     </div>
 
                     <div class="p-3">
@@ -346,96 +361,53 @@
                     </div>
                 </div>
 
-                {{-- Pagination (if paginator) --}}
+                {{-- Pagination --}}
                 @if($clearances && method_exists($clearances, 'links'))
                     <div class="mt-4">
                         {{ $clearances->withQueryString()->links() }}
                     </div>
                 @endif
-
             </div>
         </div>
     </div>
 </div>
 
-{{-- Create modal --}}
+{{-- Create modal (keep; working) --}}
 @if($canCreate)
     @include('depot-stock::compliance.clearances._create_modal', ['clients' => $clients])
 @endif
-
-@php
-    // Build JSON rows for Tabulator
-    $rows = [];
-    foreach ($items as $c) {
-        $status = $c->status ?? 'draft';
-        $meta = $statusMeta[$status] ?? ['label' => ucfirst($status)];
-
-        $rows[] = [
-            'id' => $c->id,
-            'status' => $status,
-            'status_label' => $meta['label'],
-            'client' => $c->client->name ?? '-',
-            'truck' => $c->truck_number ?? '-',
-            'trailer' => $c->trailer_number ?? '-',
-            'loaded_20_l' => $c->loaded_20_l ?? null,
-            'tr8_number' => $c->tr8_number ?? null,
-            'border_point' => $c->border_point ?? null,
-            'invoice_number' => $c->invoice_number ?? null,
-            'submitted_at' => optional($c->submitted_at ?? null)?->toDateTimeString(),
-            'tr8_issued_at' => optional($c->tr8_issued_at ?? null)?->toDateTimeString(),
-            'updated_by' => $c->updatedBy->name ?? $c->updated_by_name ?? null,
-            'updated_at' => optional($c->updated_at ?? null)?->toDateTimeString(),
-            'urls' => [
-                'show'      => route('depot.compliance.clearances.show', $c),
-                'submit'    => route('depot.compliance.clearances.submit', $c),
-                'issue_tr8' => route('depot.compliance.clearances.issue_tr8', $c),
-                'arrive'    => route('depot.compliance.clearances.arrive', $c),
-                'cancel'    => route('depot.compliance.clearances.cancel', $c),
-            ],
-        ];
-    }
-@endphp
 @endsection
 
 @push('styles')
 <style>
-    /* Make Tabulator feel native to your UI */
-    #clearancesTable .tabulator {
-        border: 0;
-        border-radius: 14px;
-    }
-    #clearancesTable .tabulator-header {
-        border-bottom: 1px solid rgba(0,0,0,.06);
-    }
-    #clearancesTable .tabulator-row {
-        border-bottom: 1px solid rgba(0,0,0,.04);
-    }
-    #clearancesTable .tabulator-row:hover {
-        background: rgba(0,0,0,.02);
-    }
+    /* Make Tabulator feel native */
+    #clearancesTable .tabulator { border: 0; border-radius: 14px; }
+    #clearancesTable .tabulator-header { border-bottom: 1px solid rgba(0,0,0,.06); }
+    #clearancesTable .tabulator-row { border-bottom: 1px solid rgba(0,0,0,.04); }
+    #clearancesTable .tabulator-row:hover { background: rgba(0,0,0,.02); }
 </style>
 @endpush
 
 @push('scripts')
 <script>
-document.addEventListener("DOMContentLoaded", function(){
-    // Ensure Tabulator exists AFTER Vite/app.js loads (stacked scripts)
+document.addEventListener("DOMContentLoaded", function () {
+    // If this logs, your pushed scripts are running but Vite/app.js didn't load before stacks.
     if (!window.Tabulator) {
-        console.error("Tabulator not found on window. Ensure Vite app.js is loaded and this script is in @push('scripts') after it.");
+        console.error("Tabulator missing on window. Check: Vite app.js loaded BEFORE @stack('scripts').");
         return;
     }
 
-    const csrf = @json(csrf_token());
+    const csrf  = @json(csrf_token());
     const canAct = @json($canAct);
-    const rows = @json($rows);
+    const rows  = @json($rows);
 
     const statusPillClass = (status) => {
-        switch(status){
-            case 'submitted': return "border-amber-200 bg-amber-50 text-amber-900";
-            case 'tr8_issued': return "border-blue-200 bg-blue-50 text-blue-900";
-            case 'arrived': return "border-emerald-200 bg-emerald-50 text-emerald-900";
-            case 'cancelled': return "border-rose-200 bg-rose-50 text-rose-900";
-            default: return "border-gray-200 bg-gray-50 text-gray-900";
+        switch (status) {
+            case "submitted":  return "border-amber-200 bg-amber-50 text-amber-900";
+            case "tr8_issued": return "border-blue-200 bg-blue-50 text-blue-900";
+            case "arrived":    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+            case "cancelled":  return "border-rose-200 bg-rose-50 text-rose-900";
+            default:           return "border-gray-200 bg-gray-50 text-gray-900";
         }
     };
 
@@ -444,18 +416,15 @@ document.addEventListener("DOMContentLoaded", function(){
 
         const btn = (label, action, tone="gray") => {
             const toneClass = ({
-                gray: "border-gray-200 hover:bg-gray-50 text-gray-800",
-                dark: "border-gray-900 bg-gray-900 text-white hover:bg-gray-800",
-                amber:"border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
-                blue: "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
-                rose: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
-                emerald:"border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+                gray:    "border-gray-200 hover:bg-gray-50 text-gray-800",
+                dark:    "border-gray-900 bg-gray-900 text-white hover:bg-gray-800",
+                amber:   "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
+                blue:    "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
+                rose:    "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
+                emerald: "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
             })[tone] || "border-gray-200 hover:bg-gray-50 text-gray-800";
 
-            return `<button type="button"
-                        class="px-3 py-1.5 rounded-xl border text-xs font-semibold ${toneClass}"
-                        data-action="${action}"
-                    >${label}</button>`;
+            return `<button type="button" class="px-3 py-1.5 rounded-xl border text-xs font-semibold ${toneClass}" data-action="${action}">${label}</button>`;
         };
 
         let html = `<div class="flex flex-wrap items-center gap-2">`;
@@ -463,38 +432,35 @@ document.addEventListener("DOMContentLoaded", function(){
 
         if (!canAct) return html + `</div>`;
 
-        if (s === 'draft') {
+        if (s === "draft") {
             html += btn("Submit", "submit", "dark");
         }
-        if (s === 'submitted') {
+        if (s === "submitted") {
             html += btn("Issue TR8", "issue_tr8", "amber");
             html += btn("Cancel", "cancel", "rose");
         }
-        if (s === 'tr8_issued') {
+        if (s === "tr8_issued") {
             html += btn("Mark arrived", "arrive", "emerald");
             html += btn("Cancel", "cancel", "rose");
         }
-
-        html += `</div>`;
-        return html;
+        return html + `</div>`;
     };
 
     const table = new Tabulator("#clearancesTable", {
         data: rows,
         layout: "fitColumns",
-        reactiveData: false,
         height: "520px",
-        selectable: 1,
         placeholder: "No clearances found for this filter.",
-        rowHeight: 52,
+        rowHeight: 48,
+        selectable: 1,
         columns: [
             {
                 title: "STATUS",
                 field: "status_label",
                 width: 150,
                 formatter: (cell) => {
-                    const data = cell.getRow().getData();
-                    return `<span class="inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${statusPillClass(data.status)}">${data.status_label}</span>`;
+                    const d = cell.getRow().getData();
+                    return `<span class="inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${statusPillClass(d.status)}">${d.status_label}</span>`;
                 }
             },
             { title: "CLIENT", field: "client", minWidth: 180 },
@@ -508,7 +474,7 @@ document.addEventListener("DOMContentLoaded", function(){
                 formatter: (cell) => {
                     const v = cell.getValue();
                     if (v === null || v === undefined || v === "") return "-";
-                    try { return Number(v).toLocaleString(); } catch(e){ return v; }
+                    try { return Number(v).toLocaleString(); } catch(e) { return v; }
                 }
             },
             { title: "TR8", field: "tr8_number", width: 140 },
@@ -518,37 +484,31 @@ document.addEventListener("DOMContentLoaded", function(){
             { title: "ISSUED", field: "tr8_issued_at", width: 170 },
             { title: "UPDATED BY", field: "updated_by", width: 170 },
             { title: "UPDATED", field: "updated_at", width: 170 },
-            {
-                title: "ACTIONS",
-                field: "actions",
-                minWidth: 260,
-                formatter: (cell) => actionHtml(cell.getRow().getData()),
-                headerSort: false
-            },
+            { title: "ACTIONS", field: "actions", minWidth: 260, formatter: (cell) => actionHtml(cell.getRow().getData()), headerSort: false },
         ],
-        rowClick: function(e, row){
+        rowClick: function (e, row) {
             const t = e.target;
             if (t.closest("button") || t.closest("a")) return;
-            const data = row.getData();
-            if (data.urls && data.urls.show) window.location.href = data.urls.show;
+            const d = row.getData();
+            if (d.urls && d.urls.show) window.location.href = d.urls.show;
         }
     });
 
     // Actions (POST via fetch)
-    document.addEventListener("click", async function(e){
+    document.addEventListener("click", async function (e) {
         const btn = e.target.closest("button[data-action]");
         if (!btn) return;
 
         const rowEl = btn.closest(".tabulator-row");
         if (!rowEl) return;
 
-        const rowComponent = table.getRow(rowEl);
-        const data = rowComponent ? rowComponent.getData() : null;
+        const row = table.getRow(rowEl);
+        const data = row ? row.getData() : null;
         if (!data) return;
 
         const action = btn.getAttribute("data-action");
 
-        const post = async (url, payload={}) => {
+        const post = async (url, payload = {}) => {
             const res = await fetch(url, {
                 method: "POST",
                 headers: {
@@ -568,41 +528,37 @@ document.addEventListener("DOMContentLoaded", function(){
 
         if (action === "submit") {
             if (!confirm("Submit this clearance?")) return;
-            const ok = await post(data.urls.submit);
-            if (ok) window.location.reload();
+            if (await post(data.urls.submit)) window.location.reload();
         }
 
         if (action === "arrive") {
             if (!confirm("Mark this clearance as arrived?")) return;
-            const ok = await post(data.urls.arrive);
-            if (ok) window.location.reload();
+            if (await post(data.urls.arrive)) window.location.reload();
         }
 
         if (action === "cancel") {
             if (!confirm("Cancel this clearance?")) return;
-            const ok = await post(data.urls.cancel);
-            if (ok) window.location.reload();
+            if (await post(data.urls.cancel)) window.location.reload();
         }
 
         if (action === "issue_tr8") {
             const tr8 = prompt("Enter TR8 number:");
             if (!tr8) return;
-            const ok = await post(data.urls.issue_tr8, { tr8_number: tr8 });
-            if (ok) window.location.reload();
+            if (await post(data.urls.issue_tr8, { tr8_number: tr8 })) window.location.reload();
         }
     });
 
-    // Exports (client-side) — respects current filter because table is built from current page rows
-    document.getElementById("btnExportXlsx")?.addEventListener("click", function(){
-        table.download("xlsx", "clearances.xlsx", {sheetName:"Clearances"});
+    // Exports (client-side; exports what the table currently has)
+    document.getElementById("btnExportXlsx")?.addEventListener("click", function () {
+        table.download("xlsx", "clearances.xlsx", { sheetName: "Clearances" });
     });
 
-    document.getElementById("btnExportPdf")?.addEventListener("click", function(){
+    document.getElementById("btnExportPdf")?.addEventListener("click", function () {
         table.download("pdf", "clearances.pdf", { orientation: "landscape", title: "Clearances" });
     });
 
-    // Open modal
-    document.getElementById("btnOpenCreateClearance")?.addEventListener("click", function(){
+    // Open createZI modal (keep)
+    document.getElementById("btnOpenCreateClearance")?.addEventListener("click", function () {
         const modal = document.getElementById("createClearanceModal");
         if (!modal) return;
         modal.classList.remove("hidden");
@@ -619,35 +575,34 @@ document.addEventListener("DOMContentLoaded", function(){
         attPanel.classList.add("hidden");
         attBtn?.setAttribute("aria-expanded", "false");
     };
+
     const openAttention = () => {
         if (!attPanel) return;
         attPanel.classList.remove("hidden");
         attBtn?.setAttribute("aria-expanded", "true");
     };
 
-    attBtn?.addEventListener("click", function(){
+    attBtn?.addEventListener("click", function () {
         if (!attPanel) return;
         const isOpen = !attPanel.classList.contains("hidden");
         isOpen ? closeAttention() : openAttention();
     });
 
-    document.addEventListener("click", function(e){
+    document.addEventListener("click", function (e) {
         if (!attWrap || !attPanel) return;
 
-        // close by close button
         if (e.target.closest("[data-att-close]")) {
             closeAttention();
             return;
         }
 
-        // click outside closes
         if (!attWrap.contains(e.target)) closeAttention();
     });
 
-    // When coming from attention links, smooth scroll to table (anchor exists)
+    // Smooth scroll when coming from attention links
     if (window.location.hash === "#clearances") {
         const el = document.getElementById("clearances");
-        if (el) el.scrollIntoView({behavior:"smooth", block:"start"});
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 });
 </script>
