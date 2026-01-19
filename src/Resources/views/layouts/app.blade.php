@@ -10,10 +10,10 @@
 
   {{-- CSS --}}
   <!-- Tailwind CDN – bypass Vite completely -->
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- <script src="https://cdn.tailwindcss.com"></script> -->
   
 <!-- remember to uncomment this during production -->
-<!-- @vite(['resources/css/app.css']) -->
+@vite(['resources/css/app.css'])
 
   {{-- Livewire styles (if you use them) --}}
   @livewireStyles
