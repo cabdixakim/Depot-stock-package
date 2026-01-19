@@ -241,27 +241,42 @@
                     {!! $pill('Cancelled', (int)$stats['cancelled'], 'cancelled', 'rose') !!}
                 </div>
 
-{{-- FILTERS: one line on desktop, stacks on mobile --}}
+{{-- FILTERS — compact single-row on desktop, stacked on mobile --}}
 <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
-    <div class="flex flex-col gap-2 lg:flex-row lg:items-end lg:gap-2 lg:flex-nowrap">
+    <div
+        class="
+            grid grid-cols-1 gap-2
+            lg:grid-cols-[12rem_9rem_1fr_10rem_10rem_auto]
+            lg:items-end
+            lg:gap-2
+        "
+    >
 
         {{-- Client --}}
-        <div class="w-full lg:w-[12rem] shrink-0">
-            <label class="text-[11px] font-semibold text-gray-600">Client</label>
-            <select name="client_id"
-                class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
-                <option value="">All</option>
+        <div>
+            <label class="lg:hidden text-[11px] font-semibold text-gray-600">Client</label>
+            <select
+                name="client_id"
+                class="h-9 w-full rounded-xl border-gray-200 bg-white text-sm
+                       focus:border-gray-900 focus:ring-gray-900/10"
+            >
+                <option value="">All clients</option>
                 @foreach($clients as $c)
-                    <option value="{{ $c->id }}" @selected((string)$fClient === (string)$c->id)>{{ $c->name }}</option>
+                    <option value="{{ $c->id }}" @selected((string)$fClient === (string)$c->id)>
+                        {{ $c->name }}
+                    </option>
                 @endforeach
             </select>
         </div>
 
         {{-- Status --}}
-        <div class="w-full lg:w-[10rem] shrink-0">
-            <label class="text-[11px] font-semibold text-gray-600">Status</label>
-            <select name="status"
-                class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10">
+        <div>
+            <label class="lg:hidden text-[11px] font-semibold text-gray-600">Status</label>
+            <select
+                name="status"
+                class="h-9 w-full rounded-xl border-gray-200 bg-white text-sm
+                       focus:border-gray-900 focus:ring-gray-900/10"
+            >
                 <option value="">All</option>
                 <option value="draft" @selected($fStatus==='draft')>Draft</option>
                 <option value="submitted" @selected($fStatus==='submitted')>Submitted</option>
@@ -272,35 +287,58 @@
         </div>
 
         {{-- Search (flexes) --}}
-        <div class="w-full lg:flex-1 min-w-0">
-            <label class="text-[11px] font-semibold text-gray-600">Search</label>
-            <input name="q" value="{{ $fSearch }}" placeholder="Truck, trailer, TR8, invoice…"
-                class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
+        <div>
+            <label class="lg:hidden text-[11px] font-semibold text-gray-600">Search</label>
+            <input
+                name="q"
+                value="{{ $fSearch }}"
+                placeholder="Truck, trailer, TR8, invoice…"
+                class="h-9 w-full rounded-xl border-gray-200 bg-white text-sm
+                       focus:border-gray-900 focus:ring-gray-900/10"
+            />
         </div>
 
-        {{-- Dates (stay inline on desktop) --}}
-        <div class="w-full sm:flex sm:gap-2 lg:w-auto lg:flex lg:gap-2 shrink-0">
-            <div class="flex-1 lg:w-[10rem] min-w-0">
-                <label class="text-[11px] font-semibold text-gray-600">From</label>
-                <input type="date" name="from" value="{{ $fFrom }}"
-                    class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
-            </div>
-
-            <div class="flex-1 lg:w-[10rem] min-w-0">
-                <label class="text-[11px] font-semibold text-gray-600">To</label>
-                <input type="date" name="to" value="{{ $fTo }}"
-                    class="mt-1 h-9 w-full rounded-xl border-gray-200 bg-white text-sm focus:border-gray-900 focus:ring-gray-900/10"/>
-            </div>
+        {{-- From --}}
+        <div>
+            <label class="lg:hidden text-[11px] font-semibold text-gray-600">From</label>
+            <input
+                type="date"
+                name="from"
+                value="{{ $fFrom }}"
+                class="h-9 w-full rounded-xl border-gray-200 bg-white text-sm
+                       focus:border-gray-900 focus:ring-gray-900/10"
+            />
         </div>
 
-        {{-- Buttons (always on the far right on desktop) --}}
-        <div class="w-full lg:w-auto lg:ml-auto flex items-center justify-end gap-2 pt-1 shrink-0">
-            <a href="{{ url()->current() }}"
-               class="h-9 inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
+        {{-- To --}}
+        <div>
+            <label class="lg:hidden text-[11px] font-semibold text-gray-600">To</label>
+            <input
+                type="date"
+                name="to"
+                value="{{ $fTo }}"
+                class="h-9 w-full rounded-xl border-gray-200 bg-white text-sm
+                       focus:border-gray-900 focus:ring-gray-900/10"
+            />
+        </div>
+
+        {{-- Actions --}}
+        <div class="flex items-center justify-end gap-2">
+            <a
+                href="{{ url()->current() }}"
+                class="h-9 inline-flex items-center rounded-xl
+                       border border-gray-200 bg-white px-3 text-sm font-semibold
+                       text-gray-800 hover:bg-gray-50"
+            >
                 Reset
             </a>
-            <button type="submit"
-                class="h-9 inline-flex items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
+
+            <button
+                type="submit"
+                class="h-9 inline-flex items-center rounded-xl
+                       bg-gray-900 px-4 text-sm font-semibold text-white
+                       hover:bg-gray-800"
+            >
                 Apply
             </button>
         </div>
