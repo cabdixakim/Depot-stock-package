@@ -1,6 +1,6 @@
 @extends('depot-stock::layouts.app')
 
-@section('Compliance')
+@section('content')
 @php
     use Optima\DepotStock\Models\Clearance;
 
