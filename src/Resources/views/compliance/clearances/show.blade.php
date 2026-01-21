@@ -281,7 +281,7 @@
                                 </div>
 
                                 <div class="mt-2 text-xs text-gray-500">
-                                    User ID: <span class="font-semibold text-gray-800">{{ $e->user_id ?? '—' }}</span>
+                                    By : <span class="font-semibold text-gray-800">{{ $e->user?->name ?? '—' }}</span>
                                 </div>
                             </div>
                         @empty
