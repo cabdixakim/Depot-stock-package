@@ -160,42 +160,57 @@ class ClearanceController extends Controller
         return back()->with('success', 'Clearance submitted');
     }
 
-    public function issueTr8(Request $request, Clearance $clearance)
-    {
-        $validated = $request->validate([
-            'tr8_number' => 'required|string',
-            'tr8_reference' => 'nullable|string',
-            'tr8_document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
-        ]);
+public function issueTr8(Request $request, Clearance $clearance)
+{
+    $validated = $request->validate([
+        'tr8_number'     => 'required|string',
+        'tr8_reference'  => 'nullable|string',
 
-        $update = [
-            'tr8_number' => $validated['tr8_number'],
-            'tr8_issued_at' => now(),
-        ];
+        // ✅ NEW: multi-file
+        'tr8_documents'     => 'nullable|array',
+        'tr8_documents.*'   => 'file|mimes:pdf,jpg,jpeg,png|max:10240',
 
-        // Only set reference if the column exists (prevents breaking)
-        if (isset($validated['tr8_reference']) && Schema::hasColumn('clearances', 'tr8_reference')) {
-            $update['tr8_reference'] = $validated['tr8_reference'];
-        }
+        // ✅ BACKWARD COMPAT: keep old single-file input working
+        'tr8_document'      => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+    ]);
 
-        $clearance->update($update);
+    $update = [
+        'tr8_number'    => $validated['tr8_number'],
+        'tr8_issued_at' => now(),
+    ];
 
-        // Optional file handling: store file safely without breaking schema
-        if ($request->hasFile('tr8_document')) {
-            $file = $request->file('tr8_document');
+    if (isset($validated['tr8_reference']) && Schema::hasColumn('clearances', 'tr8_reference')) {
+        $update['tr8_reference'] = $validated['tr8_reference'];
+    }
+
+    $clearance->update($update);
+
+    // ✅ Gather files from BOTH inputs:
+    // - new: tr8_documents[]
+    // - old: tr8_document
+    $files = [];
+
+    if ($request->hasFile('tr8_documents')) {
+        $files = array_merge($files, $request->file('tr8_documents'));
+    }
+
+    if ($request->hasFile('tr8_document')) {
+        $files[] = $request->file('tr8_document');
+    }
+
+    // Optional file handling: store files safely without breaking schema
+    if (!empty($files)) {
+        foreach ($files as $file) {
             $path = $file->store('clearances/tr8', ['disk' => 'public']);
 
-            // If you have a documents table, wire it here safely.
-            // Example guarded insert (no crash if table/columns missing):
             if (Schema::hasTable('documents')) {
                 $cols = Schema::getColumnListing('documents');
-
-                // Only insert if documents table has minimum expected fields
                 $canInsert = in_array('clearance_id', $cols) && in_array('path', $cols);
+
                 if ($canInsert) {
                     $payload = [
                         'clearance_id' => $clearance->id,
-                        'path' => $path,
+                        'path'         => $path,
                     ];
 
                     if (in_array('type', $cols)) $payload['type'] = 'tr8';
@@ -208,10 +223,12 @@ class ClearanceController extends Controller
                 }
             }
         }
-
-        $this->transition($clearance, 'tr8_issued');
-        return back()->with('success', 'TR8 issued');
     }
+
+    $this->transition($clearance, 'tr8_issued');
+
+    return back()->with('success', 'TR8 issued');
+}
 
     public function markArrived(Clearance $clearance)
     {

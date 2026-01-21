@@ -86,7 +86,7 @@
                             </span>
                         </div>
 
-                        <input id="issueTr8Document" type="file" name="tr8_document" accept=".pdf,.jpg,.jpeg,.png"
+                        <input id="issueTr8Document" type="file" name="tr8_documents[]"  accept=".pdf,.jpg,.jpeg,.png" multiple
                                class="mt-3 block w-full text-sm text-gray-700
                                       file:mr-3 file:rounded-xl file:border-0 file:bg-gray-900 file:px-4 file:py-2
                                       file:text-sm file:font-semibold file:text-white hover:file:bg-gray-800">
