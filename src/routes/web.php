@@ -293,5 +293,5 @@ Route::middleware(['web','auth', 'role:admin,compliance,accountant'])
             ->name('clearances.cancel');
         Route::get('depot/compliance/clearances/{clearance}/documents/{document}', 
             [ClearanceController::class, 'openDocument']
-        )->name('depot.compliance.clearances.documents.open');
+        )->name('compliance.clearances.documents.open');
     });
