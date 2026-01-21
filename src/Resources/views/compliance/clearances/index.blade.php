@@ -122,7 +122,7 @@
                             </button>
                         @endif
 
-                        {{-- Needs attention (bell icon + badge + dropdown panel under button) --}}
+                        {{-- Needs attention (bell icon + badge + responsive panel) --}}
                         <div class="relative" id="attWrap">
                             <button
                                 type="button"
@@ -146,11 +146,16 @@
                                 </span>
                             </button>
 
-                            {{-- PANEL: normal dropdown under the bell (small + responsive) --}}
+                            {{-- ✅ PANEL FIX: mobile uses fixed + left/right clamp; desktop stays dropdown --}}
                             <div
                                 id="attentionPanel"
-                                class="hidden absolute right-0 top-full mt-2 z-50 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
-                                       w-[22rem] max-w-[calc(100vw-1rem)]"
+                                class="hidden z-50 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
+                                       fixed sm:absolute
+                                       left-2 right-2 sm:left-auto sm:right-0
+                                       top-20 sm:top-full
+                                       sm:mt-2
+                                       w-auto sm:w-[22rem]
+                                       max-h-[calc(100vh-6rem)] overflow-auto"
                             >
                                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                                     <div class="text-sm font-semibold text-gray-900">Needs attention</div>
@@ -541,7 +546,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // -----------------------------
-    // Needs attention dropdown (under bell)
+    // Needs attention panel (mobile-safe)
     // -----------------------------
     const attBtn   = document.getElementById("btnAttention");
     const attPanel = document.getElementById("attentionPanel");
@@ -556,27 +561,33 @@ document.addEventListener("DOMContentLoaded", function () {
     function openAttention() {
         if (!attPanel) return;
 
-        // reset any previous pinning
-        attPanel.style.left = "";
-        attPanel.style.right = "";
-
         attPanel.classList.remove("hidden");
         attBtn?.setAttribute("aria-expanded", "true");
 
-        // Keep dropdown fully in viewport (pin left if it would overflow)
-        const pad = 8;
-        const rect = attPanel.getBoundingClientRect();
+        // Desktop only: clamp horizontally if needed (mobile uses fixed left/right from classes)
+        const isDesktop = window.matchMedia("(min-width: 640px)").matches;
 
-        if (rect.right > window.innerWidth - pad) {
-            attPanel.style.right = "0";
-            attPanel.style.left = "auto";
-        }
-        // If still overflowing left (very narrow screens), pin to left edge of viewport visually
-        const rect2 = attPanel.getBoundingClientRect();
-        if (rect2.left < pad) {
-            // align panel to the left of the button wrapper (better than clipping)
-            attPanel.style.left = "0";
-            attPanel.style.right = "auto";
+        if (isDesktop) {
+            attPanel.style.left = "";
+            attPanel.style.right = "";
+
+            const pad = 8;
+            const rect = attPanel.getBoundingClientRect();
+
+            if (rect.right > window.innerWidth - pad) {
+                attPanel.style.right = "0";
+                attPanel.style.left = "auto";
+            }
+
+            const rect2 = attPanel.getBoundingClientRect();
+            if (rect2.left < pad) {
+                attPanel.style.left = "0";
+                attPanel.style.right = "auto";
+            }
+        } else {
+            // Mobile: never pin with inline styles (prevents overflow bugs)
+            attPanel.style.left = "";
+            attPanel.style.right = "";
         }
     }
 
@@ -598,7 +609,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }, { passive: true });
 
     window.addEventListener("scroll", () => {
-        // dropdown UX: close on scroll so it doesn't look "floating"
         if (!attPanel) return;
         if (!attPanel.classList.contains("hidden")) closeAttention();
     }, { passive: true });
@@ -741,11 +751,8 @@ document.addEventListener("DOMContentLoaded", function () {
             { title: "BORDER", field: "border_point", width: 150 },
             { title: "SUBMITTED", field: "submitted_at", width: 165 },
             { title: "ISSUED", field: "tr8_issued_at", width: 165 },
-
-            // Keep these as REAL columns (not stacked)
             { title: "UPDATED BY", field: "updated_by_name", width: 170 },
             { title: "AGE", field: "age_human", width: 120 },
-
             {
                 title: "ACTIONS",
                 field: "id",
@@ -774,7 +781,6 @@ document.addEventListener("DOMContentLoaded", function () {
                                 >${label}</button>`;
                     };
 
-                    // single-line actions, no wrap
                     let html = `<div class="inline-flex items-center gap-2 whitespace-nowrap">`;
 
                     if (s === "draft") {
@@ -832,7 +838,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (action === "issue") {
-                // Open the real modal (multipart)
                 openIssueTr8Modal(id);
             }
         } catch (err) {
@@ -843,7 +848,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // -----------------------------
     // Exports (client-side)
-    // NOTE: Remote pagination exports current loaded page.
     // -----------------------------
     document.getElementById("btnExportXlsx")?.addEventListener("click", () => {
         table.download("xlsx", "clearances.xlsx", { sheetName: "Clearances" });
