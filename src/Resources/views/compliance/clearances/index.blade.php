@@ -94,7 +94,7 @@
             <div class="p-5 sm:p-6">
 
                 {{-- HEADER --}}
-                <div class="flex items-start justify-between gap-6">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
                     <div class="min-w-0">
                         <div class="text-xs text-gray-500">Compliance</div>
                         <h1 class="mt-1 text-xl font-semibold tracking-tight text-gray-900">Clearances &amp; TR8</h1>
@@ -108,25 +108,26 @@
                         </div>
                     </div>
 
-                    {{-- Actions area (keep buttons FAR apart) --}}
-                    <div class="flex items-center justify-end gap-4 sm:gap-6 lg:gap-10">
+                    {{-- Actions area --}}
+                    <div class="flex items-center justify-start sm:justify-end gap-2 sm:gap-3 flex-wrap">
                         @if($canCreate)
                             <button
                                 type="button"
-                                class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+                                class="h-9 inline-flex items-center gap-2 rounded-xl bg-gray-900 px-3 sm:px-4 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/20"
                                 id="btnOpenCreateClearance"
                             >
                                 <span class="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/10 text-base leading-none">+</span>
-                                <span>New clearance</span>
+                                <span class="hidden sm:inline">New clearance</span>
+                                <span class="sm:hidden">New</span>
                             </button>
                         @endif
 
-                        {{-- Needs attention (bell icon + badge + responsive fixed panel) --}}
+                        {{-- Needs attention (bell icon + badge + dropdown panel under button) --}}
                         <div class="relative" id="attWrap">
                             <button
                                 type="button"
                                 id="btnAttention"
-                                class="group relative inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                                class="group relative h-9 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-3 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
                                 aria-haspopup="true"
                                 aria-expanded="false"
                                 title="Needs attention"
@@ -145,12 +146,11 @@
                                 </span>
                             </button>
 
-                            {{-- PANEL: fixed, wide, responsive, never off-screen --}}
+                            {{-- PANEL: normal dropdown under the bell (small + responsive) --}}
                             <div
                                 id="attentionPanel"
-                                class="hidden fixed z-50 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
-                                       w-[min(36rem,calc(50vw-1rem))]"
-                                style="top: 5rem; right: .5rem; max-width: calc(50vw - 1rem);"
+                                class="hidden absolute right-0 top-full mt-2 z-50 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
+                                       w-[22rem] max-w-[calc(100vw-1rem)]"
                             >
                                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                                     <div class="text-sm font-semibold text-gray-900">Needs attention</div>
@@ -160,7 +160,7 @@
                                 </div>
 
                                 <div class="p-3 text-[12px] text-gray-600">
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div class="grid grid-cols-1 gap-2">
                                         <a href="{{ $makeFilterUrl(['status' => 'submitted', '__att' => 'stuck_submitted']) }}#clearances"
                                            class="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2 hover:bg-gray-50">
                                             <div class="min-w-0">
@@ -302,13 +302,13 @@
 </form>
 
                 {{-- LIST HEADER + EXPORTS --}}
-                <div id="clearances" class="mt-5 flex items-center justify-between gap-3">
+                <div id="clearances" class="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                         <div class="text-sm font-semibold text-gray-900">Clearances</div>
                         <div class="text-xs text-gray-500">Row click opens record. Actions update workflow.</div>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <button type="button" class="h-9 inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50" id="btnExportXlsx">
                             Export Excel
                         </button>
@@ -320,7 +320,7 @@
 
                 {{-- TABULATOR --}}
                 <div class="mt-3 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                    <div class="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                    <div class="px-4 py-2 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div class="text-xs text-gray-500">Tip: use filters above + click a row</div>
                         <div class="text-xs text-gray-400">Remote pagination enabled</div>
                     </div>
@@ -541,7 +541,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // -----------------------------
-    // Needs attention panel (keep as-is)
+    // Needs attention dropdown (under bell)
     // -----------------------------
     const attBtn   = document.getElementById("btnAttention");
     const attPanel = document.getElementById("attentionPanel");
@@ -555,26 +555,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function openAttention() {
         if (!attPanel) return;
+
+        // reset any previous pinning
+        attPanel.style.left = "";
+        attPanel.style.right = "";
+
         attPanel.classList.remove("hidden");
         attBtn?.setAttribute("aria-expanded", "true");
 
-        // Keep panel in viewport
-        const rect = attPanel.getBoundingClientRect();
+        // Keep dropdown fully in viewport (pin left if it would overflow)
         const pad = 8;
+        const rect = attPanel.getBoundingClientRect();
 
-        // If overflowing left, pin it
-        if (rect.left < pad) {
-            attPanel.style.left = "0.5rem";
-            attPanel.style.right = "auto";
-        } else {
-            attPanel.style.left = "";
+        if (rect.right > window.innerWidth - pad) {
             attPanel.style.right = "0";
+            attPanel.style.left = "auto";
         }
-
-        // If overflowing right, also pin left
+        // If still overflowing left (very narrow screens), pin to left edge of viewport visually
         const rect2 = attPanel.getBoundingClientRect();
-        if (rect2.right > (window.innerWidth - pad)) {
-            attPanel.style.left = "0.5rem";
+        if (rect2.left < pad) {
+            // align panel to the left of the button wrapper (better than clipping)
+            attPanel.style.left = "0";
             attPanel.style.right = "auto";
         }
     }
@@ -590,6 +591,17 @@ document.addEventListener("DOMContentLoaded", function () {
         if (e.target.closest("[data-att-close]")) { closeAttention(); return; }
         if (!attWrap.contains(e.target)) closeAttention();
     });
+
+    window.addEventListener("resize", () => {
+        if (!attPanel) return;
+        if (!attPanel.classList.contains("hidden")) openAttention();
+    }, { passive: true });
+
+    window.addEventListener("scroll", () => {
+        // dropdown UX: close on scroll so it doesn't look "floating"
+        if (!attPanel) return;
+        if (!attPanel.classList.contains("hidden")) closeAttention();
+    }, { passive: true });
 
     // -----------------------------
     // POST helper (JSON) for actions
