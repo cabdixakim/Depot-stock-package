@@ -371,6 +371,9 @@
     @include('depot-stock::compliance.clearances._create_modal', ['clients' => $clients])
 @endif
 
+{{-- tr8 modal --}}
+@include('depot-stock::compliance.clearances._issue_tr8_modal')
+
 {{-- Confirm modal (generic) --}}
 <div id="confirmModal" class="hidden fixed inset-0 z-50 items-center justify-center">
     <div class="absolute inset-0 bg-black/30" data-modal-backdrop="confirm"></div>
