@@ -911,6 +911,57 @@ document.addEventListener("DOMContentLoaded", function () {
         const el = document.getElementById("clearances");
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+
+//    -----------------------------
+// Issue TR8 modal: file input preview + remove
+  const input = document.getElementById("issueTr8Document");
+  const preview = document.getElementById("tr8FilePreview");
+  if (!input || !preview) return;
+
+  function render() {
+    const files = Array.from(input.files || []);
+    preview.innerHTML = "";
+
+    if (!files.length) {
+      preview.classList.add("hidden");
+      return;
+    }
+
+    preview.classList.remove("hidden");
+
+    files.forEach((f, idx) => {
+      const row = document.createElement("div");
+      row.className = "flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2";
+
+      row.innerHTML = `
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-gray-900 truncate">${f.name}</div>
+          <div class="text-[11px] text-gray-500">${(f.size/1024/1024).toFixed(2)} MB</div>
+        </div>
+        <button type="button"
+          class="shrink-0 rounded-lg border border-gray-200 px-2 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
+          data-remove="${idx}">
+          Remove
+        </button>
+      `;
+
+      preview.appendChild(row);
+    });
+
+    preview.querySelectorAll("button[data-remove]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const removeIndex = Number(btn.getAttribute("data-remove"));
+        const dt = new DataTransfer();
+        files.forEach((file, i) => { if (i !== removeIndex) dt.items.add(file); });
+        input.files = dt.files;
+        render();
+      });
+    });
+  }
+
+  input.addEventListener("change", render);
+
+
 });
 
   // auto-hide

@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Storage;
 use Optima\DepotStock\Models\Clearance;
 use Optima\DepotStock\Models\ClearanceEvent;
 use Optima\DepotStock\Models\Client;
+use Optima\DepotStock\Models\ClearanceDocument;
+
 
 class ClearanceController extends Controller
 {
@@ -160,18 +162,18 @@ class ClearanceController extends Controller
         return back()->with('success', 'Clearance submitted');
     }
 
+// Issue TR8
+
 public function issueTr8(Request $request, Clearance $clearance)
 {
     $validated = $request->validate([
         'tr8_number'     => 'required|string',
         'tr8_reference'  => 'nullable|string',
 
-        // ✅ NEW: multi-file
-        'tr8_documents'     => 'nullable|array',
-        'tr8_documents.*'   => 'file|mimes:pdf,jpg,jpeg,png|max:10240',
+        'tr8_documents'   => 'nullable|array',
+        'tr8_documents.*' => 'file|mimes:pdf,jpg,jpeg,png|max:10240',
 
-        // ✅ BACKWARD COMPAT: keep old single-file input working
-        'tr8_document'      => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        'tr8_document'    => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
     ]);
 
     $update = [
@@ -179,50 +181,33 @@ public function issueTr8(Request $request, Clearance $clearance)
         'tr8_issued_at' => now(),
     ];
 
-    if (isset($validated['tr8_reference']) && Schema::hasColumn('clearances', 'tr8_reference')) {
+    if (array_key_exists('tr8_reference', $validated) && Schema::hasColumn('clearances', 'tr8_reference')) {
         $update['tr8_reference'] = $validated['tr8_reference'];
     }
 
     $clearance->update($update);
 
-    // ✅ Gather files from BOTH inputs:
-    // - new: tr8_documents[]
-    // - old: tr8_document
+    // Gather files from BOTH inputs
     $files = [];
 
     if ($request->hasFile('tr8_documents')) {
         $files = array_merge($files, $request->file('tr8_documents'));
     }
-
     if ($request->hasFile('tr8_document')) {
         $files[] = $request->file('tr8_document');
     }
 
-    // Optional file handling: store files safely without breaking schema
-    if (!empty($files)) {
-        foreach ($files as $file) {
-            $path = $file->store('clearances/tr8', ['disk' => 'public']);
+    // ✅ Save into clearance_documents
+    foreach ($files as $file) {
+        $path = $file->store('clearances/tr8', 'public');
 
-            if (Schema::hasTable('documents')) {
-                $cols = Schema::getColumnListing('documents');
-                $canInsert = in_array('clearance_id', $cols) && in_array('path', $cols);
-
-                if ($canInsert) {
-                    $payload = [
-                        'clearance_id' => $clearance->id,
-                        'path'         => $path,
-                    ];
-
-                    if (in_array('type', $cols)) $payload['type'] = 'tr8';
-                    if (in_array('original_name', $cols)) $payload['original_name'] = $file->getClientOriginalName();
-                    if (in_array('uploaded_by', $cols)) $payload['uploaded_by'] = Auth::id();
-                    if (in_array('created_at', $cols)) $payload['created_at'] = now();
-                    if (in_array('updated_at', $cols)) $payload['updated_at'] = now();
-
-                    DB::table('documents')->insert($payload);
-                }
-            }
-        }
+        ClearanceDocument::create([
+            'clearance_id'   => $clearance->id,
+            'type'           => 'tr8',
+            'file_path'      => $path,
+            'original_name'  => $file->getClientOriginalName(),
+            'uploaded_by'    => Auth::id(),
+        ]);
     }
 
     $this->transition($clearance, 'tr8_issued');

@@ -90,6 +90,7 @@
                                class="mt-3 block w-full text-sm text-gray-700
                                       file:mr-3 file:rounded-xl file:border-0 file:bg-gray-900 file:px-4 file:py-2
                                       file:text-sm file:font-semibold file:text-white hover:file:bg-gray-800">
+                           <div id="tr8FilePreview" class="mt-3 space-y-2 hidden"></div>            
                     </div>
                 </div>
             </div>
