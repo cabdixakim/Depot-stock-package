@@ -226,9 +226,6 @@
                     @else
                         <div class="divide-y divide-gray-100">
                             @foreach($docsTr8 as $doc)
-                                @php
-                                    $url = \Illuminate\Support\Facades\Storage::disk('public')->url($doc->file_path);
-                                @endphp
                                 <div class="p-4 sm:p-5 flex items-center justify-between gap-4">
                                     <div class="min-w-0">
                                         <div class="text-sm font-semibold text-gray-900 truncate">
@@ -239,7 +236,8 @@
                                         </div>
                                     </div>
 
-                                    <a href="{{ $url }}" target="_blank"
+                                    {{-- ✅ OPEN via secure route (fixes Apache/XAMPP "Not Found") --}}
+                                    <a href="{{ route('depot.compliance.clearances.documents.open', [$clearance, $doc]) }}" target="_blank"
                                        class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                             <path d="M12 3v10m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>

@@ -321,4 +321,25 @@ public function issueTr8(Request $request, Clearance $clearance)
             ],
         ]);
     }
+
+// Open Clearance Document
+
+ public function openDocument(Clearance $clearance, ClearanceDocument $document)
+    {
+        // Ensure the document belongs to this clearance
+        abort_unless((int)$document->clearance_id === (int)$clearance->id, 404);
+
+        // Optional: auth/role gate
+        // abort_unless(auth()->check(), 403);
+
+        $disk = Storage::disk('public');
+
+        abort_unless($disk->exists($document->file_path), 404);
+
+        // Inline display for PDF/images (opens in browser)
+        return $disk->response($document->file_path, $document->original_name, [
+            'Content-Disposition' => 'inline; filename="'.$document->original_name.'"',
+        ]);
+    }
+
 }
