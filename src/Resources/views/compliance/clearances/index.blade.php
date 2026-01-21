@@ -482,7 +482,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const dataUrl = @json(route('depot.compliance.clearances.data'));
 
     // -----------------------------
-    // Helpers: URLs (never depend on row.urls)
+    // Helpers: URLs
     // -----------------------------
     const showUrl   = (id) => `${baseUrl}/${id}`;
     const submitUrl = (id) => `${baseUrl}/${id}/submit`;
@@ -492,13 +492,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // -----------------------------
     // Helpers: simple modal open/close
-    // (Create + Issue TR8)
     // -----------------------------
     const openModal = (id) => {
         const el = document.getElementById(id);
         if (!el) return;
         el.classList.remove("hidden");
         el.classList.add("flex");
+        el.setAttribute("aria-hidden", "false");
     };
 
     const closeModal = (id) => {
@@ -506,6 +506,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!el) return;
         el.classList.add("hidden");
         el.classList.remove("flex");
+        el.setAttribute("aria-hidden", "true");
     };
 
     // Close on backdrop + close buttons (your modals use data-close-modal)
@@ -520,53 +521,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // issue tr8 modal uses "issue_tr8"
         if (val === "issue_tr8") closeModal("issueTr8Modal");
-    });
-
-    // Esc closes both modals + attention panel
-    document.addEventListener("keydown", (e) => {
-        if (e.key !== "Escape") return;
-        closeModal("createClearanceModal");
-        closeModal("issueTr8Modal");
-        closeAttention();
-    });
-
-    // Open Create modal
-    document.getElementById("btnOpenCreateClearance")?.addEventListener("click", () => {
-        openModal("createClearanceModal");
-    });
-
-    // -----------------------------
-    // Issue TR8 modal wiring
-    // - Open from Tabulator action button
-    // - Set form action dynamically
-    // - Save button submits the form (multipart)
-    // -----------------------------
-    const issueTr8Form   = document.getElementById("issueTr8Form");
-    const issueTr8Submit = document.getElementById("issueTr8Submit");
-    const issueTr8Action = document.getElementById("issueTr8Action");
-
-    function openIssueTr8Modal(clearanceId) {
-        if (!issueTr8Form) return;
-        const action = issueUrl(clearanceId);
-        issueTr8Form.setAttribute("action", action);
-        if (issueTr8Action) issueTr8Action.value = action;
-
-        // clear fields for a clean UX
-        const num = document.getElementById("issueTr8Number");
-        if (num) num.value = "";
-        const ref = document.getElementById("issueTr8Reference");
-        if (ref) ref.value = "";
-        const doc = document.getElementById("issueTr8Document");
-        if (doc) doc.value = "";
-
-        openModal("issueTr8Modal");
-        setTimeout(() => document.getElementById("issueTr8Number")?.focus(), 50);
-    }
-
-    issueTr8Submit?.addEventListener("click", () => {
-        if (!issueTr8Form) return;
-        // native submit so file upload works
-        issueTr8Form.submit();
     });
 
     // -----------------------------
@@ -637,6 +591,53 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!attPanel.classList.contains("hidden")) closeAttention();
     }, { passive: true });
 
+    // Esc closes modals + attention panel
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        closeModal("createClearanceModal");
+        closeModal("issueTr8Modal");
+        closeAttention();
+    });
+
+    // Open Create modal
+    document.getElementById("btnOpenCreateClearance")?.addEventListener("click", () => {
+        openModal("createClearanceModal");
+    });
+
+    // -----------------------------
+    // Issue TR8 modal wiring
+    // -----------------------------
+    const issueTr8Form   = document.getElementById("issueTr8Form");
+    const issueTr8Submit = document.getElementById("issueTr8Submit");
+    const issueTr8Action = document.getElementById("issueTr8Action");
+
+    function openIssueTr8Modal(clearanceId) {
+        if (!issueTr8Form) {
+            console.error("issueTr8Form not found. Ensure the TR8 modal is included in index blade.");
+            return;
+        }
+
+        const action = issueUrl(clearanceId);
+        issueTr8Form.setAttribute("action", action);
+        if (issueTr8Action) issueTr8Action.value = action;
+
+        // clear fields for a clean UX
+        const num = document.getElementById("issueTr8Number");
+        if (num) num.value = "";
+        const ref = document.getElementById("issueTr8Reference");
+        if (ref) ref.value = "";
+        const doc = document.getElementById("issueTr8Document");
+        if (doc) doc.value = "";
+
+        openModal("issueTr8Modal");
+        setTimeout(() => document.getElementById("issueTr8Number")?.focus(), 50);
+    }
+
+    issueTr8Submit?.addEventListener("click", () => {
+        if (!issueTr8Form) return;
+        issueTr8Form.submit(); // native submit for multipart
+    });
+
     // -----------------------------
     // POST helper (JSON) for actions
     // -----------------------------
@@ -693,7 +694,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // -----------------------------
-    // Tabulator: remote pagination + stable response shaping
+    // Tabulator
+    // - Remove rowClick navigation (you asked)
+    // - Add subtle "Open" action button
     // -----------------------------
     const rowToneClass = (status) => {
         switch ((status || "").toString()) {
@@ -707,7 +710,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const table = new Tabulator("#clearancesTable", {
         layout: "fitColumns",
-        responsiveLayout: false,              // IMPORTANT: prevents “stacking under rows”
+        responsiveLayout: false,
         height: "560px",
         placeholder: "No clearances found for this filter.",
         pagination: true,
@@ -718,7 +721,6 @@ document.addEventListener("DOMContentLoaded", function () {
         ajaxParams: () => Object.fromEntries(new URLSearchParams(window.location.search).entries()),
 
         ajaxResponse: function (url, params, resp) {
-            // Controller returns: {data: [...], meta:{...}}
             return {
                 data: Array.isArray(resp?.data) ? resp.data : [],
                 current_page: resp?.meta?.current_page ?? 1,
@@ -739,15 +741,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const el = row.getElement();
             const s  = row.getData().status;
             el.classList.add(rowToneClass(s));
-            el.style.cursor = "pointer";
         },
 
-        rowClick: function (e, row) {
-            // Don’t navigate if clicking a button
-            if (e.target.closest("button")) return;
-            const id = row.getData().id;
-            if (id) window.location.href = showUrl(id);
-        },
+        // NOTE: no rowClick navigation now (per your request)
 
         columns: [
             {
@@ -779,25 +775,22 @@ document.addEventListener("DOMContentLoaded", function () {
             { title: "UPDATED BY", field: "updated_by_name", width: 170 },
             { title: "AGE", field: "age_human", width: 120 },
 
-            // ✅ FIX: handle action clicks inside the cell (reliable with Tabulator)
             {
                 title: "ACTIONS",
                 field: "id",
                 headerSort: false,
-                width: 320,
+                width: 380,
                 formatter: (cell) => {
                     const d = cell.getRow().getData();
                     const id = d.id;
                     const s = d.status;
 
-                    if (!canAct) return `<span class="text-xs text-gray-400">—</span>`;
-
                     const btn = (label, action, tone = "gray") => {
                         const toneClass = ({
                             gray: "border-gray-200 bg-white text-gray-800 hover:bg-gray-50",
+                            subtle: "border-transparent bg-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                             dark: "border-gray-900 bg-gray-900 text-white hover:bg-gray-800",
                             amber: "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
-                            blue: "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
                             rose: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
                             emerald: "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
                         })[tone] || "border-gray-200 bg-white text-gray-800 hover:bg-gray-50";
@@ -809,6 +802,14 @@ document.addEventListener("DOMContentLoaded", function () {
                     };
 
                     let html = `<div class="inline-flex items-center gap-2 whitespace-nowrap">`;
+
+                    // ✅ Always present: Open (subtle)
+                    html += btn("Open", "open", "subtle");
+
+                    if (!canAct) {
+                        html += `</div>`;
+                        return html;
+                    }
 
                     if (s === "draft") {
                         html += btn("Submit", "submit", "dark");
@@ -834,17 +835,25 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (!btn) return;
 
                     e.preventDefault();
-                    e.stopPropagation(); // prevents rowClick navigation
+                    e.stopPropagation();
 
                     const action = btn.getAttribute("data-action");
                     const id = btn.getAttribute("data-id");
 
                     try {
+                        if (action === "open") {
+                            window.location.href = showUrl(id);
+                            return;
+                        }
+
+                        if (!canAct) return;
+
                         if (action === "submit") {
                             const ok = await openConfirm({ title: "Submit clearance", text: "Submit this clearance now?" });
                             if (!ok) return;
                             await postJson(submitUrl(id));
                             window.location.reload();
+                            return;
                         }
 
                         if (action === "arrive") {
@@ -852,6 +861,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             if (!ok) return;
                             await postJson(arriveUrl(id));
                             window.location.reload();
+                            return;
                         }
 
                         if (action === "cancel") {
@@ -859,10 +869,12 @@ document.addEventListener("DOMContentLoaded", function () {
                             if (!ok) return;
                             await postJson(cancelUrl(id));
                             window.location.reload();
+                            return;
                         }
 
                         if (action === "issue") {
                             openIssueTr8Modal(id);
+                            return;
                         }
                     } catch (err) {
                         alert(("Action failed:\n\n" + (err?.message || err)).slice(0, 600));
@@ -891,21 +903,9 @@ document.addEventListener("DOMContentLoaded", function () {
         const el = document.getElementById("clearances");
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+
+    // auto-hide toast
+    setTimeout(() => document.getElementById('successToast')?.remove(), 3200);
 });
-
-  // auto-hide
-  setTimeout(() => document.getElementById('successToast')?.remove(), 3200);
 </script>
-
-<style>
-/* Row tinting by status (subtle) */
-#clearancesTable .tabulator-row.row-draft     { background: rgba(148, 163, 184, 0.06); } /* slate tint */
-#clearancesTable .tabulator-row.row-submitted { background: rgba(245, 158, 11, 0.08); } /* amber */
-#clearancesTable .tabulator-row.row-tr8       { background: rgba(59, 130, 246, 0.07); } /* blue */
-#clearancesTable .tabulator-row.row-arrived   { background: rgba(16, 185, 129, 0.08); } /* emerald */
-#clearancesTable .tabulator-row.row-cancelled { background: rgba(244, 63, 94, 0.07); }  /* rose */
-
-/* Keep hover readable on tinted rows */
-#clearancesTable .tabulator-row:hover { filter: brightness(0.98); }
-</style>
 @endpush
