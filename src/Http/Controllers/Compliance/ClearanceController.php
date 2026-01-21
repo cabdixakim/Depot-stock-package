@@ -145,6 +145,7 @@ class ClearanceController extends Controller
         return view('depot-stock::compliance.clearances.show', [
             'clearance' => $clearance->load(['client', 'documents']),
             'events' => ClearanceEvent::where('clearance_id', $clearance->id)
+                ->with('user')
                 ->orderBy('created_at')
                 ->get(),
         ]);

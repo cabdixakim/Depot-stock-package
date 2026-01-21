@@ -23,4 +23,10 @@ class ClearanceEvent extends Model
     {
         return $this->belongsTo(Clearance::class);
     }
+
+    public function user()
+    {
+        $userModel = config('auth.providers.users.model');
+        return $this->belongsTo($userModel, 'user_id');
+    }
 }
