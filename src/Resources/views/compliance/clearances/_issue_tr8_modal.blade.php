@@ -56,6 +56,17 @@
               enctype="multipart/form-data"
               class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 sm:py-5"
         >
+            {{-- Validation errors --}}
+        @if ($errors->any())
+            <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+                <div class="font-semibold">Please fix the errors:</div>
+                <ul class="mt-2 list-disc pl-5 space-y-1">
+                    @foreach ($errors->all() as $err)
+                        <li>{{ $err }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
             @csrf
             <input type="hidden" id="issueTr8Action" value="">
 

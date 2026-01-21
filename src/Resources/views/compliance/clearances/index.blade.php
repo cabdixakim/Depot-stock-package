@@ -541,13 +541,81 @@ document.addEventListener("DOMContentLoaded", function () {
     // - Open from Tabulator action button
     // - Set form action dynamically
     // - Save button submits the form (multipart)
+    //
+    // ✅ PATCHES:
+    // 1) use requestSubmit() (so required validation triggers)
+    // 2) multi-file picker keeps previous selection + preview/remove works
     // -----------------------------
     const issueTr8Form   = document.getElementById("issueTr8Form");
     const issueTr8Submit = document.getElementById("issueTr8Submit");
     const issueTr8Action = document.getElementById("issueTr8Action");
 
+    // Multi-file state
+    const tr8Input   = document.getElementById("issueTr8Document");
+    const tr8Preview = document.getElementById("tr8FilePreview");
+    let tr8Files = []; // ✅ keeps files across multiple picks
+
+    function syncTr8InputFiles() {
+        if (!tr8Input) return;
+        const dt = new DataTransfer();
+        tr8Files.forEach(f => dt.items.add(f));
+        tr8Input.files = dt.files;
+    }
+
+    function renderTr8Preview() {
+        if (!tr8Preview) return;
+        tr8Preview.innerHTML = "";
+
+        if (!tr8Files.length) {
+            tr8Preview.classList.add("hidden");
+            return;
+        }
+
+        tr8Preview.classList.remove("hidden");
+
+        tr8Files.forEach((f, idx) => {
+            const row = document.createElement("div");
+            row.className = "flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2";
+
+            row.innerHTML = `
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-gray-900 truncate">${f.name}</div>
+                  <div class="text-[11px] text-gray-500">${(f.size/1024/1024).toFixed(2)} MB</div>
+                </div>
+                <button type="button"
+                  class="shrink-0 rounded-lg border border-gray-200 px-2 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
+                  data-remove="${idx}">
+                  Remove
+                </button>
+            `;
+
+            row.querySelector("[data-remove]")?.addEventListener("click", () => {
+                tr8Files.splice(idx, 1);
+                syncTr8InputFiles();
+                renderTr8Preview();
+            });
+
+            tr8Preview.appendChild(row);
+        });
+    }
+
+    // Merge newly selected files into tr8Files (prevents “swapping”)
+    if (tr8Input && tr8Preview) {
+        tr8Input.addEventListener("change", () => {
+            const picked = Array.from(tr8Input.files || []);
+            picked.forEach(f => {
+                // Optional de-dupe by name+size
+                const exists = tr8Files.some(x => x.name === f.name && x.size === f.size);
+                if (!exists) tr8Files.push(f);
+            });
+            syncTr8InputFiles();
+            renderTr8Preview();
+        });
+    }
+
     function openIssueTr8Modal(clearanceId) {
         if (!issueTr8Form) return;
+
         const action = issueUrl(clearanceId);
         issueTr8Form.setAttribute("action", action);
         if (issueTr8Action) issueTr8Action.value = action;
@@ -557,17 +625,21 @@ document.addEventListener("DOMContentLoaded", function () {
         if (num) num.value = "";
         const ref = document.getElementById("issueTr8Reference");
         if (ref) ref.value = "";
-        const doc = document.getElementById("issueTr8Document");
-        if (doc) doc.value = "";
+
+        // ✅ reset file state (important when switching clearances)
+        tr8Files = [];
+        if (tr8Input) tr8Input.value = "";
+        syncTr8InputFiles();
+        if (tr8Preview) { tr8Preview.innerHTML = ""; tr8Preview.classList.add("hidden"); }
 
         openModal("issueTr8Modal");
         setTimeout(() => document.getElementById("issueTr8Number")?.focus(), 50);
     }
 
+    // ✅ PATCH: requestSubmit triggers HTML5 required validation
     issueTr8Submit?.addEventListener("click", () => {
         if (!issueTr8Form) return;
-        // native submit so file upload works
-        issueTr8Form.submit();
+        issueTr8Form.requestSubmit();
     });
 
     // -----------------------------
@@ -780,7 +852,7 @@ document.addEventListener("DOMContentLoaded", function () {
             { title: "UPDATED BY", field: "updated_by_name", width: 170 },
             { title: "AGE", field: "age_human", width: 120 },
 
-            // ✅ FIX: handle action clicks inside the cell (reliable with Tabulator)
+            // Actions column
             {
                 title: "ACTIONS",
                 field: "id",
@@ -791,7 +863,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     const id = d.id;
                     const s = d.status;
 
-                    // ✅ ADD: subtle Open button (always available)
                     const openBtn = `<button type="button"
                         class="px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold whitespace-nowrap border-transparent bg-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                         data-action="open" data-id="${id}"
@@ -820,8 +891,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     };
 
                     let html = `<div class="inline-flex items-center gap-2 whitespace-nowrap">`;
-
-                    // ✅ Open (subtle) first
                     html += openBtn;
 
                     if (s === "draft") {
@@ -854,7 +923,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     const id = btn.getAttribute("data-id");
 
                     try {
-                        // ✅ NEW: Open action
                         if (action === "open") {
                             window.location.href = showUrl(id);
                             return;
@@ -911,62 +979,24 @@ document.addEventListener("DOMContentLoaded", function () {
         const el = document.getElementById("clearances");
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-
-//    -----------------------------
-// Issue TR8 modal: file input preview + remove
-  const input = document.getElementById("issueTr8Document");
-  const preview = document.getElementById("tr8FilePreview");
-  if (!input || !preview) return;
-
-  function render() {
-    const files = Array.from(input.files || []);
-    preview.innerHTML = "";
-
-    if (!files.length) {
-      preview.classList.add("hidden");
-      return;
-    }
-
-    preview.classList.remove("hidden");
-
-    files.forEach((f, idx) => {
-      const row = document.createElement("div");
-      row.className = "flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2";
-
-      row.innerHTML = `
-        <div class="min-w-0">
-          <div class="text-sm font-semibold text-gray-900 truncate">${f.name}</div>
-          <div class="text-[11px] text-gray-500">${(f.size/1024/1024).toFixed(2)} MB</div>
-        </div>
-        <button type="button"
-          class="shrink-0 rounded-lg border border-gray-200 px-2 py-1 text-[12px] font-semibold text-gray-700 hover:bg-gray-50"
-          data-remove="${idx}">
-          Remove
-        </button>
-      `;
-
-      preview.appendChild(row);
-    });
-
-    preview.querySelectorAll("button[data-remove]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const removeIndex = Number(btn.getAttribute("data-remove"));
-        const dt = new DataTransfer();
-        files.forEach((file, i) => { if (i !== removeIndex) dt.items.add(file); });
-        input.files = dt.files;
-        render();
-      });
-    });
-  }
-
-  input.addEventListener("change", render);
-
-
 });
 
-  // auto-hide
-  setTimeout(() => document.getElementById('successToast')?.remove(), 3200);
+// auto-hide toast
+setTimeout(() => document.getElementById('successToast')?.remove(), 3200);
 </script>
+
+{{-- Auto-open Issue TR8 modal if there are validation errors --}}
+@if ($errors->any())
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const modal = document.getElementById('issueTr8Modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  });
+</script>
+@endif
+
 
 <style>
 /* Row tinting by status (subtle) */
@@ -979,4 +1009,5 @@ document.addEventListener("DOMContentLoaded", function () {
 /* Keep hover readable on tinted rows */
 #clearancesTable .tabulator-row:hover { filter: brightness(0.98); }
 </style>
+
 @endpush
