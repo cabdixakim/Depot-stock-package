@@ -149,8 +149,8 @@
                             <div
                                 id="attentionPanel"
                                 class="hidden fixed z-50 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden
-                                       w-[min(56rem,calc(100vw-1rem))]"
-                                style="top: 5rem; right: .5rem; max-width: calc(100vw - 1rem);"
+                                       w-[min(36rem,calc(50vw-1rem))]"
+                                style="top: 5rem; right: .5rem; max-width: calc(50vw - 1rem);"
                             >
                                 <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                                     <div class="text-sm font-semibold text-gray-900">Needs attention</div>
