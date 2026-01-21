@@ -132,8 +132,9 @@ class ClearanceController extends Controller
             'user_id' => Auth::id(),
         ]);
 
+        // ✅ stay on index + toast
         return redirect()
-            ->route('depot.compliance.clearances.show', $clearance)
+            ->route('depot.compliance.clearances.index')
             ->with('success', 'Clearance created');
     }
 
@@ -156,7 +157,7 @@ class ClearanceController extends Controller
             $clearance->update(['submitted_at' => now()]);
         }
 
-        return back();
+        return back()->with('success', 'Clearance submitted');
     }
 
     public function issueTr8(Request $request, Clearance $clearance)
@@ -209,7 +210,7 @@ class ClearanceController extends Controller
         }
 
         $this->transition($clearance, 'tr8_issued');
-        return back();
+        return back()->with('success', 'TR8 issued');
     }
 
     public function markArrived(Clearance $clearance)
@@ -219,13 +220,13 @@ class ClearanceController extends Controller
         }
 
         $this->transition($clearance, 'arrived');
-        return back();
+        return back()->with('success', 'Marked as arrived');
     }
 
     public function cancel(Clearance $clearance)
     {
         $this->transition($clearance, 'cancelled');
-        return back();
+        return back()->with('success', 'Clearance cancelled');
     }
 
     protected function transition(Clearance $clearance, string $to)

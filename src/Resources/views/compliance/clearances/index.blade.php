@@ -87,7 +87,27 @@
 
     $now = now();
 @endphp
-
+@if (session('success'))
+<div id="successToast"
+     class="fixed top-4 right-4 z-[60] max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-lg">
+    <div class="flex items-start gap-3">
+        <div class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="min-w-0">
+            <div class="text-sm font-semibold text-emerald-900">Success</div>
+            <div class="text-sm text-emerald-800">{{ session('success') }}</div>
+        </div>
+        <button type="button"
+                class="ml-auto rounded-xl px-2 py-1 text-emerald-900/70 hover:bg-emerald-100"
+                onclick="document.getElementById('successToast')?.remove()">
+            ✕
+        </button>
+    </div>
+</div>
+@endif
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="mt-6">
         <div class="rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -529,7 +549,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (issueTr8Action) issueTr8Action.value = action;
 
         // clear fields for a clean UX
-        document.getElementById("issueTr8Number")?.value && (document.getElementById("issueTr8Number").value = "");
+        const num = document.getElementById("issueTr8Number");
+        if (num) num.value = "";
         const ref = document.getElementById("issueTr8Reference");
         if (ref) ref.value = "";
         const doc = document.getElementById("issueTr8Document");
@@ -715,6 +736,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const el = row.getElement();
             const s  = row.getData().status;
             el.classList.add(rowToneClass(s));
+            el.style.cursor = "pointer";
         },
 
         rowClick: function (e, row) {
@@ -753,6 +775,8 @@ document.addEventListener("DOMContentLoaded", function () {
             { title: "ISSUED", field: "tr8_issued_at", width: 165 },
             { title: "UPDATED BY", field: "updated_by_name", width: 170 },
             { title: "AGE", field: "age_human", width: 120 },
+
+            // ✅ FIX: handle action clicks inside the cell (reliable with Tabulator)
             {
                 title: "ACTIONS",
                 field: "id",
@@ -801,49 +825,49 @@ document.addEventListener("DOMContentLoaded", function () {
                     html += `</div>`;
                     return html;
                 },
+
+                cellClick: async (e, cell) => {
+                    const btn = e.target.closest("button[data-action][data-id]");
+                    if (!btn) return;
+
+                    e.preventDefault();
+                    e.stopPropagation(); // prevents rowClick navigation
+
+                    const action = btn.getAttribute("data-action");
+                    const id = btn.getAttribute("data-id");
+
+                    try {
+                        if (action === "submit") {
+                            const ok = await openConfirm({ title: "Submit clearance", text: "Submit this clearance now?" });
+                            if (!ok) return;
+                            await postJson(submitUrl(id));
+                            window.location.reload();
+                        }
+
+                        if (action === "arrive") {
+                            const ok = await openConfirm({ title: "Mark arrived", text: "Mark this clearance as arrived?" });
+                            if (!ok) return;
+                            await postJson(arriveUrl(id));
+                            window.location.reload();
+                        }
+
+                        if (action === "cancel") {
+                            const ok = await openConfirm({ title: "Cancel clearance", text: "Cancel this clearance? This is a workflow action." });
+                            if (!ok) return;
+                            await postJson(cancelUrl(id));
+                            window.location.reload();
+                        }
+
+                        if (action === "issue") {
+                            openIssueTr8Modal(id);
+                        }
+                    } catch (err) {
+                        alert(("Action failed:\n\n" + (err?.message || err)).slice(0, 600));
+                        console.error(err);
+                    }
+                },
             },
         ],
-    });
-
-    // -----------------------------
-    // Action buttons inside table
-    // -----------------------------
-    document.addEventListener("click", async function (e) {
-        const btn = e.target.closest("button[data-action][data-id]");
-        if (!btn) return;
-
-        const action = btn.getAttribute("data-action");
-        const id = btn.getAttribute("data-id");
-
-        try {
-            if (action === "submit") {
-                const ok = await openConfirm({ title: "Submit clearance", text: "Submit this clearance now?" });
-                if (!ok) return;
-                await postJson(submitUrl(id));
-                window.location.reload();
-            }
-
-            if (action === "arrive") {
-                const ok = await openConfirm({ title: "Mark arrived", text: "Mark this clearance as arrived?" });
-                if (!ok) return;
-                await postJson(arriveUrl(id));
-                window.location.reload();
-            }
-
-            if (action === "cancel") {
-                const ok = await openConfirm({ title: "Cancel clearance", text: "Cancel this clearance? This is a workflow action." });
-                if (!ok) return;
-                await postJson(cancelUrl(id));
-                window.location.reload();
-            }
-
-            if (action === "issue") {
-                openIssueTr8Modal(id);
-            }
-        } catch (err) {
-            alert(("Action failed:\n\n" + (err?.message || err)).slice(0, 600));
-            console.error(err);
-        }
     });
 
     // -----------------------------
@@ -865,6 +889,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 });
+
+  // auto-hide
+  setTimeout(() => document.getElementById('successToast')?.remove(), 3200);
 </script>
 
 <style>
