@@ -375,7 +375,6 @@ public function issueTr8(Request $request, Clearance $clearance)
 }
 
     // Link preview for Offload modal
-    
 public function linkPreview(Clearance $clearance)
 {
     $clearance->load(['documents']);
