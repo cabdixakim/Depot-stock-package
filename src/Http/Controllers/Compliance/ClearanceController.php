@@ -343,4 +343,88 @@ public function issueTr8(Request $request, Clearance $clearance)
         ]);
     }
 
+    // Linkable clearances for Offload modal
+
+    public function linkable(Request $request)
+{
+    $clientId = $request->query('client_id');
+
+    $q = Clearance::query()
+        ->select(['id', 'client_id', 'status', 'truck_number', 'trailer_number', 'loaded_20_l', 'tr8_number'])
+        ->when($clientId, fn($qq) => $qq->where('client_id', $clientId))
+        // only safe statuses for linking
+        ->whereIn('status', ['tr8_issued', 'arrived'])
+        ->where('status', '!=', 'cancelled')
+        // not already linked to an offload
+        ->whereDoesntHave('offload') // requires relationship OR change to manual check later
+        ->orderByDesc('id')
+        ->limit(200);
+
+    $rows = $q->get()->map(function ($c) {
+        return [
+            'id'            => $c->id,
+            'status'        => $c->status,
+            'truck_number'  => $c->truck_number,
+            'trailer_number'=> $c->trailer_number,
+            'loaded_20_l'   => $c->loaded_20_l,
+            'tr8_number'    => $c->tr8_number,
+        ];
+    });
+
+    return response()->json($rows);
+}
+
+    // Link preview for Offload modal
+    
+public function linkPreview(Clearance $clearance)
+{
+    $clearance->load(['documents']);
+
+    // Eligibility rules
+    $can = true;
+    $reason = null;
+
+    if ($clearance->status === 'cancelled') {
+        $can = false;
+        $reason = 'This clearance is cancelled.';
+    }
+
+    if (!in_array($clearance->status, ['tr8_issued', 'arrived'], true)) {
+        $can = false;
+        $reason = 'This clearance is not in a linkable status.';
+    }
+
+    // Already linked? (requires relationship OR subquery alternative)
+    if ($can && $clearance->offload) {
+        $can = false;
+        $reason = 'This clearance is already linked to an offload.';
+    }
+
+    $docs = $clearance->documents->map(function ($d) use ($clearance) {
+        return [
+            'id'            => $d->id,
+            'type'          => $d->type,
+            'original_name' => $d->original_name,
+            // reuse your existing secure viewer
+            'open_url'      => route('depot.compliance.clearances.documents.open', [$clearance->id, $d->id]),
+        ];
+    })->values();
+
+    return response()->json([
+        'id'            => $clearance->id,
+        'status'        => $clearance->status,
+
+        // Autofill sources
+        'truck_number'  => $clearance->truck_number,
+        'trailer_number'=> $clearance->trailer_number,
+        'loaded_20_l'   => $clearance->loaded_20_l,
+        'tr8_number'    => $clearance->tr8_number,
+
+        'can_link'      => $can,
+        'reason'        => $reason,
+
+        'documents'     => $docs,
+    ]);
+}
+ 
 }

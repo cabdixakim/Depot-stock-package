@@ -50,4 +50,11 @@ class Clearance extends Model
     {
         return $this->hasMany(ClearanceEvent::class);
     }
+   
+    // Relation to Offload
+    public function offload()
+{
+    return $this->hasOne(\Optima\DepotStock\Models\Offload::class, 'clearance_id');
+}
+
 }

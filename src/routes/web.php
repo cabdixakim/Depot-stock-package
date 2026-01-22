@@ -294,4 +294,12 @@ Route::middleware(['web','auth', 'role:admin,compliance,accountant'])
         Route::get('clearances/{clearance}/documents/{document}', 
             [ClearanceController::class, 'openDocument']
         )->name('clearances.documents.open');
+
+        // Linkable list + preview (read-only) for Offload modal
+Route::get('/clearances/linkable', [ClearanceController::class, 'linkable'])
+    ->name('clearances.linkable');
+
+Route::get('/clearances/{clearance}/link-preview', [ClearanceController::class, 'linkPreview'])
+    ->name('clearances.linkPreview');
+    
     });

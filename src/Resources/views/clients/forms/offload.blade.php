@@ -1,5 +1,8 @@
 {{-- resources/views/depot-stock/clients/forms/offload.blade.php --}}
-<div id="offloadModal" class="fixed inset-0 z-[120] hidden">
+<div id="offloadModal"
+     class="fixed inset-0 z-[120] hidden"
+     data-clearance-list-url="{{ url('/depot/compliance/clearances/linkable') }}"
+     data-clearance-preview-url="{{ url('/depot/compliance/clearances') }}/__ID__/link-preview">
   <!-- Backdrop -->
   <button type="button" class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" data-offload-close aria-label="Close"></button>
 
@@ -7,10 +10,19 @@
   <div class="absolute inset-0 flex items-start justify-center p-4 md:p-8 overflow-y-auto">
     <div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-gray-100">
       <div class="flex items-center justify-between border-b px-6 py-4 bg-emerald-50/60 rounded-t-2xl">
-        <h3 class="font-semibold text-gray-900 text-lg flex items-center gap-2">
-          <span class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-emerald-600 text-white text-[11px] font-bold">IN</span>
-          Offload (Delivered to Depot)
-        </h3>
+        <div class="flex items-center gap-3">
+          <h3 class="font-semibold text-gray-900 text-lg flex items-center gap-2">
+            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-emerald-600 text-white text-[11px] font-bold">IN</span>
+            Offload (Delivered to Depot)
+          </h3>
+
+          {{-- Mode badge --}}
+          <span id="offloadModeBadge"
+                class="hidden items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+            Compliance: TR8 Linked
+          </span>
+        </div>
+
         <button type="button" class="text-gray-500 hover:text-gray-800" data-offload-close aria-label="Close">✕</button>
       </div>
 
@@ -22,8 +34,117 @@
         @csrf
         <input type="hidden" name="client_id" value="{{ $client->id }}">
 
+        {{-- Compliance mode flags (conditional on UI toggle) --}}
+        <input type="hidden" id="off_link_mode" name="link_clearance" value="0">
+        <input type="hidden" id="off_clearance_id" name="clearance_id" value="">
+
         {{-- Top-level error banner (matches load’s UX) --}}
         <div id="offloadFormBanner" class="hidden rounded-md border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-xs"></div>
+
+        {{-- Mode Switch (Walk-in vs Link Clearance) --}}
+        <div class="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wide text-gray-600">Offload Mode</div>
+              <div class="text-[12px] text-gray-500 mt-0.5">
+                Walk-in is default. Link Clearance pulls plates + declared loaded qty and shows TR8 docs.
+              </div>
+            </div>
+
+            <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+              <button type="button"
+                      id="btnModeWalkin"
+                      class="px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-900 text-white"
+                      data-mode="walkin">
+                Walk-in
+              </button>
+              <button type="button"
+                      id="btnModeClearance"
+                      class="px-3 py-1.5 rounded-md text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                      data-mode="clearance">
+                Link Clearance (TR8)
+              </button>
+            </div>
+          </div>
+
+          {{-- Clearance Mode Panel (hidden until enabled) --}}
+          <div id="clearanceModePanel" class="hidden mt-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="font-medium text-gray-700 text-xs uppercase tracking-wide" for="off_clearance_select">
+                  Clearance (plates)
+                </label>
+
+                <div class="mt-1 flex gap-2">
+                  <select id="off_clearance_select"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    <option value="">Loading clearances…</option>
+                  </select>
+
+                  <button type="button"
+                          id="btnClearanceChange"
+                          class="hidden shrink-0 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold">
+                    Change
+                  </button>
+                </div>
+
+                <p id="clearanceSelectHelp" class="mt-1 text-xs text-gray-500">
+                  Select a clearance to auto-fill plates + loaded qty and review TR8 documents.
+                </p>
+                <p id="clearanceSelectErr" class="hidden text-xs text-red-600 mt-1"></p>
+              </div>
+
+              <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs font-semibold text-emerald-900">Clearance Preview</div>
+                  <span id="clearanceStatusPill"
+                        class="hidden text-[11px] font-semibold px-2 py-1 rounded-full border border-emerald-200 bg-white text-emerald-800">
+                    —
+                  </span>
+                </div>
+
+                <div class="mt-2 space-y-1 text-[12px] text-gray-700">
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Truck</span>
+                    <span id="clearancePrevTruck" class="font-semibold text-gray-900">—</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Trailer</span>
+                    <span id="clearancePrevTrailer" class="font-semibold text-gray-900">—</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Loaded @20</span>
+                    <span id="clearancePrevLoaded" class="font-semibold text-gray-900">—</span>
+                  </div>
+                </div>
+
+                <div id="clearanceEligibility"
+                     class="hidden mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  —
+                </div>
+              </div>
+            </div>
+
+            {{-- Documents --}}
+            <div class="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+              <div class="flex items-center justify-between">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-700">TR8 Documents</div>
+                <span id="docsCount" class="text-[11px] text-gray-500">0 files</span>
+              </div>
+
+              <div id="docsEmpty" class="mt-3 text-xs text-gray-500">
+                Select a clearance to see its documents here.
+              </div>
+
+              <ul id="docsList" class="hidden mt-3 divide-y divide-gray-100"></ul>
+
+              <div id="docsWarn"
+                   class="hidden mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                This clearance has no TR8 documents. Upload TR8 in the clearance dossier before linking.
+              </div>
+            </div>
+          </div>
+        </div>
 
         {{-- Row 1: Date & Tank --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -153,6 +274,34 @@
   const closeEls = modal.querySelectorAll('[data-offload-close]');
   const banner   = document.getElementById('offloadFormBanner');
 
+  // Mode UI
+  const btnWalkin     = document.getElementById('btnModeWalkin');
+  const btnClearance  = document.getElementById('btnModeClearance');
+  const modeBadge     = document.getElementById('offloadModeBadge');
+  const modePanel     = document.getElementById('clearanceModePanel');
+  const linkModeInput = document.getElementById('off_link_mode');
+  const clearanceIdEl = document.getElementById('off_clearance_id');
+
+  // Clearance widgets
+  const clearanceSelect   = document.getElementById('off_clearance_select');
+  const clearanceErr      = document.getElementById('clearanceSelectErr');
+  const btnClearanceChange= document.getElementById('btnClearanceChange');
+  const statusPill        = document.getElementById('clearanceStatusPill');
+  const prevTruck         = document.getElementById('clearancePrevTruck');
+  const prevTrailer       = document.getElementById('clearancePrevTrailer');
+  const prevLoaded        = document.getElementById('clearancePrevLoaded');
+  const eligibilityBox    = document.getElementById('clearanceEligibility');
+
+  const docsCount = document.getElementById('docsCount');
+  const docsEmpty = document.getElementById('docsEmpty');
+  const docsList  = document.getElementById('docsList');
+  const docsWarn  = document.getElementById('docsWarn');
+
+  // Offload inputs to autofill
+  const inTruck  = document.getElementById('in_truck');
+  const inTrailer= document.getElementById('in_trailer');
+  const inLoaded = document.getElementById('in_loaded');
+
   // open/close (same as Load)
   openBtn?.addEventListener('click', () => modal.classList.remove('hidden'));
   closeEls.forEach(b => b.addEventListener('click', () => modal.classList.add('hidden')));
@@ -160,6 +309,8 @@
   // helpers (same style as Load)
   const clearErrors = () => {
     banner.classList.add('hidden'); banner.textContent = '';
+    clearanceErr.classList.add('hidden'); clearanceErr.textContent = '';
+    eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
     form.querySelectorAll('.err').forEach(e => { e.textContent=''; e.classList.add('hidden'); });
     form.querySelectorAll('input,select').forEach(el => el.classList.remove('border-red-400','ring-red-300'));
   };
@@ -208,10 +359,255 @@
   ['input','change'].forEach(evt => [elObs,elTemp,elRho,elCvf,elLoad].forEach(el=>el?.addEventListener(evt,recalc)));
   recalc();
 
+  // -------------------------------
+  // Compliance mode (Link Clearance)
+  // -------------------------------
+  let clearanceListLoaded = false;
+
+  const setMode = (mode) => {
+    const isClearance = mode === 'clearance';
+
+    // toggle button styling
+    btnWalkin.classList.toggle('bg-gray-900', !isClearance);
+    btnWalkin.classList.toggle('text-white', !isClearance);
+    btnWalkin.classList.toggle('text-gray-700', isClearance);
+    btnWalkin.classList.toggle('hover:bg-gray-100', isClearance);
+
+    btnClearance.classList.toggle('bg-gray-900', isClearance);
+    btnClearance.classList.toggle('text-white', isClearance);
+    btnClearance.classList.toggle('text-gray-700', !isClearance);
+    btnClearance.classList.toggle('hover:bg-gray-100', !isClearance);
+
+    modePanel.classList.toggle('hidden', !isClearance);
+    modeBadge.classList.toggle('hidden', !isClearance);
+    linkModeInput.value = isClearance ? '1' : '0';
+
+    if (!isClearance) {
+      // reset clearance state (walk-in must be clean)
+      unlockClearance();
+      clearanceIdEl.value = '';
+      statusPill.classList.add('hidden'); statusPill.textContent = '—';
+      prevTruck.textContent = '—';
+      prevTrailer.textContent = '—';
+      prevLoaded.textContent = '—';
+      docsCount.textContent = '0 files';
+      docsEmpty.classList.remove('hidden');
+      docsList.classList.add('hidden'); docsList.innerHTML = '';
+      docsWarn.classList.add('hidden');
+      eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
+      return;
+    }
+
+    // load list only once per page session
+    if (!clearanceListLoaded) loadLinkableClearances();
+  };
+
+  const lockClearance = () => {
+    clearanceSelect.disabled = true;
+    btnClearanceChange.classList.remove('hidden');
+  };
+  const unlockClearance = () => {
+    clearanceSelect.disabled = false;
+    btnClearanceChange.classList.add('hidden');
+    clearanceSelect.value = '';
+    clearanceIdEl.value = '';
+  };
+
+  btnWalkin?.addEventListener('click', () => setMode('walkin'));
+  btnClearance?.addEventListener('click', () => setMode('clearance'));
+  btnClearanceChange?.addEventListener('click', () => {
+    unlockClearance();
+    // Keep panel visible; just clear preview + docs
+    statusPill.classList.add('hidden'); statusPill.textContent = '—';
+    prevTruck.textContent = '—';
+    prevTrailer.textContent = '—';
+    prevLoaded.textContent = '—';
+    eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
+    docsCount.textContent = '0 files';
+    docsEmpty.classList.remove('hidden');
+    docsList.classList.add('hidden'); docsList.innerHTML = '';
+    docsWarn.classList.add('hidden');
+  });
+
+  async function loadLinkableClearances() {
+    const listUrl = modal.dataset.clearanceListUrl;
+    clearanceSelect.innerHTML = `<option value="">Loading clearances…</option>`;
+    clearanceSelect.disabled = true;
+
+    try {
+      const url = new URL(listUrl, window.location.origin);
+      url.searchParams.set('client_id', '{{ $client->id }}');
+
+      const res = await fetch(url.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      });
+
+      if (!res.ok) throw new Error('Failed to load clearances');
+
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : (data.data || data.rows || []);
+
+      clearanceSelect.innerHTML = `<option value="">Select clearance…</option>`;
+      rows.forEach(r => {
+        const id = r.id ?? r.clearance_id;
+        const truck = r.truck_number ?? r.truck_plate ?? '';
+        const trailer = r.trailer_number ?? r.trailer_plate ?? '';
+        const label = [truck, trailer].filter(Boolean).join(' • ') || (`Clearance #${id}`);
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = label;
+        clearanceSelect.appendChild(opt);
+      });
+
+      clearanceSelect.disabled = false;
+      clearanceListLoaded = true;
+    } catch (e) {
+      clearanceSelect.innerHTML = `<option value="">Could not load clearances</option>`;
+      clearanceSelect.disabled = true;
+      clearanceErr.textContent = 'Failed to load clearances for this client.';
+      clearanceErr.classList.remove('hidden');
+    }
+  }
+
+  clearanceSelect?.addEventListener('change', async () => {
+    clearErrors();
+
+    const id = clearanceSelect.value;
+    if (!id) return;
+
+    // lock selection instantly
+    lockClearance();
+    clearanceIdEl.value = id;
+
+    // fetch preview
+    const tpl = modal.dataset.clearancePreviewUrl;
+    const url = tpl.replace('__ID__', encodeURIComponent(id));
+
+    // reset preview UI while loading
+    statusPill.classList.add('hidden');
+    prevTruck.textContent = '…';
+    prevTrailer.textContent = '…';
+    prevLoaded.textContent = '…';
+    docsCount.textContent = '…';
+    docsEmpty.classList.remove('hidden');
+    docsList.classList.add('hidden'); docsList.innerHTML = '';
+    docsWarn.classList.add('hidden');
+    eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
+
+    try {
+      const res = await fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error('Preview failed');
+
+      const p = await res.json();
+
+      // Eligibility message (server can compute can_link + reason)
+      if (p.can_link === false) {
+        eligibilityBox.textContent = p.reason || 'This clearance cannot be linked.';
+        eligibilityBox.classList.remove('hidden');
+      }
+
+      // Status pill
+      if (p.status) {
+        statusPill.textContent = String(p.status).replaceAll('_',' ').toUpperCase();
+        statusPill.classList.remove('hidden');
+      }
+
+      // Populate preview + form
+      const truck = p.truck_number ?? p.truck_plate ?? '';
+      const trailer = p.trailer_number ?? p.trailer_plate ?? '';
+      const loaded20 = p.loaded_20_l ?? p.loaded_at_20 ?? p.loaded_qty ?? null;
+
+      prevTruck.textContent = truck || '—';
+      prevTrailer.textContent = trailer || '—';
+      prevLoaded.textContent = (loaded20 !== null && loaded20 !== undefined && loaded20 !== '') ? Number(loaded20).toLocaleString() : '—';
+
+      // Autofill form fields (editable)
+      if (truck && inTruck) inTruck.value = truck;
+      if (trailer && inTrailer) inTrailer.value = trailer;
+      if (loaded20 !== null && loaded20 !== undefined && loaded20 !== '' && inLoaded) {
+        inLoaded.value = Number(loaded20).toFixed(3);
+        recalc();
+      }
+
+      // Docs
+      const docs = Array.isArray(p.documents) ? p.documents : [];
+      docsCount.textContent = `${docs.length} file${docs.length === 1 ? '' : 's'}`;
+
+      if (!docs.length) {
+        docsEmpty.classList.add('hidden');
+        docsList.classList.add('hidden');
+        docsWarn.classList.remove('hidden');
+      } else {
+        docsWarn.classList.add('hidden');
+        docsEmpty.classList.add('hidden');
+        docsList.classList.remove('hidden');
+        docsList.innerHTML = '';
+
+        docs.forEach(d => {
+          const li = document.createElement('li');
+          li.className = 'py-2 flex items-center justify-between gap-3';
+
+          const left = document.createElement('div');
+          left.className = 'min-w-0';
+
+          const name = document.createElement('div');
+          name.className = 'text-sm font-semibold text-gray-900 truncate';
+          name.textContent = d.original_name || d.name || d.filename || 'Document';
+
+          const meta = document.createElement('div');
+          meta.className = 'text-xs text-gray-500';
+          meta.textContent = (d.type || 'document').toString().replaceAll('_',' ');
+
+          left.appendChild(name);
+          left.appendChild(meta);
+
+          const right = document.createElement('div');
+          right.className = 'shrink-0 flex items-center gap-2';
+
+          // Prefer server-provided URLs (best)
+          const viewUrl = d.open_url || d.url_view || d.url || null;
+
+          const a = document.createElement('a');
+          a.className = 'px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700';
+          a.textContent = 'View';
+          a.target = '_blank';
+          a.rel = 'noopener';
+          if (viewUrl) a.href = viewUrl;
+          else a.href = '#';
+
+          right.appendChild(a);
+
+          li.appendChild(left);
+          li.appendChild(right);
+
+          docsList.appendChild(li);
+        });
+      }
+    } catch (e) {
+      clearanceErr.textContent = 'Failed to load clearance preview.';
+      clearanceErr.classList.remove('hidden');
+      unlockClearance();
+    }
+  });
+
+  // Default mode
+  setMode('walkin');
+
   // --- Submit (identical flow to Load) ---
   form?.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     clearErrors();
+
+    // If in clearance mode, require a selected clearance (client-side, soft; server enforces too)
+    const isLinking = linkModeInput.value === '1';
+    if (isLinking && !clearanceIdEl.value) {
+      clearanceErr.textContent = 'Select a clearance to link.';
+      clearanceErr.classList.remove('hidden');
+      showBanner('Clearance link is enabled. Please select a clearance.');
+      return;
+    }
 
     // Soft client-side warnings (doesn't block submit)
     const date  = form.querySelector('[name="date"]').value.trim();
