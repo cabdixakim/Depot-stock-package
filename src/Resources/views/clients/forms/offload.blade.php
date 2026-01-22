@@ -144,6 +144,49 @@
               </div>
             </div>
           </div>
+
+          {{-- Compliance bypass (Walk-in only) --}}
+<div id="bypassPanel" class="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+  <div class="flex items-start justify-between gap-3">
+    <div>
+      <div class="text-xs font-semibold uppercase tracking-wide text-amber-900">Compliance Bypass</div>
+      <div class="text-[12px] text-amber-800/80 mt-0.5">
+        Optional. If this offload is not linked to a TR8 clearance, record a reason for audit.
+      </div>
+    </div>
+    <span class="text-[11px] font-semibold px-2 py-1 rounded-full border border-amber-200 bg-white text-amber-900">
+      Walk-in
+    </span>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+    <div>
+      <label class="font-medium text-amber-900 text-xs uppercase tracking-wide" for="bypass_reason">
+        Bypass reason (optional)
+      </label>
+      <select id="bypass_reason" name="compliance_bypass_reason"
+              class="mt-1 w-full border border-amber-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400">
+        <option value="">Select reason…</option>
+        <option value="walk_in_customer">Walk-in customer</option>
+        <option value="tr8_not_available">TR8 not available</option>
+        <option value="emergency_unloading">Emergency unloading</option>
+        <option value="system_issue">System issue</option>
+        <option value="other">Other</option>
+      </select>
+      <p class="err err-offload-compliance_bypass_reason hidden text-xs text-red-600 mt-1"></p>
+    </div>
+
+    <div>
+      <label class="font-medium text-amber-900 text-xs uppercase tracking-wide" for="bypass_notes">
+        Notes (optional)
+      </label>
+      <input id="bypass_notes" name="compliance_bypass_notes" type="text" maxlength="255"
+             class="mt-1 w-full border border-amber-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
+             placeholder="Short explanation (optional)">
+      <p class="err err-offload-compliance_bypass_notes hidden text-xs text-red-600 mt-1"></p>
+    </div>
+  </div>
+</div>
         </div>
 
         {{-- Row 1: Date & Tank --}}
@@ -400,6 +443,18 @@
 
     // load list only once per page session
     if (!clearanceListLoaded) loadLinkableClearances();
+
+    const bypassPanel = document.getElementById('bypassPanel');
+    const bypassReason = document.getElementById('bypass_reason');
+    const bypassNotes  = document.getElementById('bypass_notes');
+
+    if (isClearance) {
+      bypassPanel?.classList.add('hidden');
+      if (bypassReason) bypassReason.value = '';
+      if (bypassNotes)  bypassNotes.value  = '';
+    } else {
+      bypassPanel?.classList.remove('hidden');
+    }
   };
 
   const lockClearance = () => {
