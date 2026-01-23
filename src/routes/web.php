@@ -252,7 +252,9 @@ Route::middleware(['web', 'auth', 'client.portal'])
     });
 
         
-//         
+// =========================================================
+// COMPLIANCE MODULE (/depot/compliance/...)
+// =========================================================   
 
 Route::middleware(['web','auth', 'role:admin,compliance,accountant'])
     ->prefix('depot/compliance')

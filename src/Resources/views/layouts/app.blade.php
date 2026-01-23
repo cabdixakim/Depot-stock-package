@@ -29,11 +29,13 @@
     $u = auth()->user();
     $roleNames = $u?->roles?->pluck('name')->map(fn ($r) => strtolower($r))->all() ?? [];
 
-    $isAdmin     = in_array('admin', $roleNames) || in_array('owner', $roleNames) || in_array('superadmin', $roleNames);
-    $isOps       = in_array('operations', $roleNames) || in_array('ops', $roleNames);
-    $isAccounts  = in_array('accounts', $roleNames) || in_array('accounting', $roleNames);
+    $isAdmin      = in_array('admin', $roleNames) || in_array('owner', $roleNames) || in_array('superadmin', $roleNames);
+    $isOps        = in_array('operations', $roleNames) || in_array('ops', $roleNames);
+    $isAccounts   = in_array('accounts', $roleNames) || in_array('accounting', $roleNames);
+    $isCompliance = in_array('compliance', $roleNames);
 
-    $isPureOps   = $isOps && ! $isAdmin && ! $isAccounts;
+    $isPureOps        = $isOps && ! $isAdmin && ! $isAccounts && ! $isCompliance;
+    $isPureCompliance = $isCompliance && ! $isAdmin && ! $isAccounts && ! $isOps;
   @endphp
 
   @php
@@ -86,44 +88,54 @@
           </a>
         @endif
 
-        {{-- Main nav gated by roles (desktop only) --}}
-        <nav class="hidden md:flex items-center gap-1">
-          @unless($isPureOps)
-            {{-- Everyone --}}
-            <a href="{{ route('depot.dashboard') }}" class="navlink">Dashboard</a>
+      {{-- Main nav gated by roles (desktop only) --}}
+      <nav class="hidden md:flex items-center gap-1">
+        {{-- Main app links: hidden for pure ops AND pure compliance --}}
+        @unless($isPureOps || $isPureCompliance)
+          {{-- Everyone --}}
+          <a href="{{ route('depot.dashboard') }}" class="navlink">Dashboard</a>
 
-            {{-- Ops + Accounts + Admin --}}
-            @if($isAdmin || $isAccounts || $isOps )
-              <a href="{{ route('depot.clients.index') }}" class="navlink">Clients</a>
-            @endif
+          {{-- Ops + Accounts + Admin --}}
+          @if($isAdmin || $isAccounts || $isOps)
+            <a href="{{ route('depot.clients.index') }}" class="navlink">Clients</a>
+          @endif
 
-            {{-- Accounts + Admin --}}
-            @if($isAccounts || $isAdmin)
-              <a href="{{ route('depot.invoices.index') }}" class="navlink">Invoices</a>
-              <a href="{{ route('depot.payments.index') }}" class="navlink">Payments</a>
-            @endif
+          {{-- Accounts + Admin --}}
+          @if($isAccounts || $isAdmin)
+            <a href="{{ route('depot.invoices.index') }}" class="navlink">Invoices</a>
+            <a href="{{ route('depot.payments.index') }}" class="navlink">Payments</a>
+          @endif
 
-            {{-- Admin + Accounts --}}
-            @if($isAdmin || $isAccounts)
-              <a href="{{ route('depot.pool.index') }}" class="navlink">Depot Pool</a>
-            @endif
-          @endunless
+          {{-- Admin + Accounts --}}
+          @if($isAdmin || $isAccounts)
+            <a href="{{ route('depot.pool.index') }}" class="navlink">Depot Pool</a>
+          @endif
+        @endunless
 
-          {{-- Tank Dips / Depot operations (always visible) --}}
-          @php
-            $isDepotOps = str_starts_with(request()->route()?->getName() ?? '', 'depot.operations.');
-          @endphp
+        {{-- Compliance link (admin/accounts/compliance can see it) --}}
+        @if($isAdmin || $isAccounts || $isCompliance)
+          <a href="{{ route('depot.compliance.clearances.index') }}" class="navlink">Compliance</a>
+        @endif
 
-          <a href="{{ route('depot.operations.index') }}"
-             class="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium
-                {{ $isDepotOps ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
-            <svg class="h-4 w-4 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M4 7h16M4 12h10M4 17h7M17 10l3 2-3 2" />
-            </svg>
-            <span>Depot operations</span>
-          </a>
-        </nav>
+        {{-- Depot operations: only for ops/admin/accounts, NOT for pure compliance --}}
+        @unless($isPureCompliance)
+          @if($isAdmin || $isAccounts || $isOps)
+            @php
+              $isDepotOps = str_starts_with(request()->route()?->getName() ?? '', 'depot.operations.');
+            @endphp
+
+            <a href="{{ route('depot.operations.index') }}"
+              class="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium
+                  {{ $isDepotOps ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+              <svg class="h-4 w-4 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M4 7h16M4 12h10M4 17h7M17 10l3 2-3 2" />
+              </svg>
+              <span>Depot operations</span>
+            </a>
+          @endif
+        @endunless
+      </nav>
       </div>
 
       <div class="flex items-center gap-2">
@@ -131,7 +143,7 @@
         @yield('topbar-search')
 
         {{-- Custom Depot dropdown (hidden for pure ops) --}}
-        @unless($isPureOps)
+        @unless($isPureOps || $isPureCompliance)
           <div id="depotDropdown" class="hidden md:flex items-center gap-2 mr-2">
             <span class="text-[11px] uppercase tracking-wide text-gray-400">Depot</span>
 
@@ -240,30 +252,40 @@
       </div>
     </div>
 
-    {{-- Mobile collapsible nav --}}
-    <div id="mobileNavPanel" class="md:hidden hidden border-t border-gray-100 bg-white">
-      <div class="mx-auto max-w-7xl px-4 py-2 space-y-1 text-sm">
-        @unless($isPureOps)
-          <a href="{{ route('depot.dashboard') }}" class="navlink block">Dashboard</a>
+  {{-- Mobile collapsible nav --}}
+  <div id="mobileNavPanel" class="md:hidden hidden border-t border-gray-100 bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-2 space-y-1 text-sm">
+      {{-- Main app links: hidden for pure ops AND pure compliance --}}
+      @unless($isPureOps || $isPureCompliance)
+        <a href="{{ route('depot.dashboard') }}" class="navlink block">Dashboard</a>
 
-          @if($isAdmin || $isAccounts || $isOps )
-            <a href="{{ route('depot.clients.index') }}" class="navlink block">Clients</a>
-          @endif
+        @if($isAdmin || $isAccounts || $isOps)
+          <a href="{{ route('depot.clients.index') }}" class="navlink block">Clients</a>
+        @endif
 
-          @if($isAccounts || $isAdmin)
-            <a href="{{ route('depot.invoices.index') }}" class="navlink block">Invoices</a>
-            <a href="{{ route('depot.payments.index') }}" class="navlink block">Payments</a>
-          @endif
+        @if($isAccounts || $isAdmin)
+          <a href="{{ route('depot.invoices.index') }}" class="navlink block">Invoices</a>
+          <a href="{{ route('depot.payments.index') }}" class="navlink block">Payments</a>
+        @endif
 
-          @if($isAdmin || $isAccounts)
-            <a href="{{ route('depot.pool.index') }}" class="navlink block">Depot Pool</a>
-          @endif
-        @endunless
+        @if($isAdmin || $isAccounts)
+          <a href="{{ route('depot.pool.index') }}" class="navlink block">Depot Pool</a>
+        @endif
+      @endunless
 
-        {{-- Depot operations always --}}
-        <a href="{{ route('depot.operations.index') }}" class="navlink block">Depot operations</a>
-      </div>
+      {{-- Compliance link (admin/accounts/compliance can see it) --}}
+      @if($isAdmin || $isAccounts || $isCompliance)
+        <a href="{{ route('depot.compliance.clearances.index') }}" class="navlink block">Compliance</a>
+      @endif
+
+      {{-- Depot operations: only for ops/admin/accounts, NOT for pure compliance --}}
+      @unless($isPureCompliance)
+        @if($isAdmin || $isAccounts || $isOps)
+          <a href="{{ route('depot.operations.index') }}" class="navlink block">Depot operations</a>
+        @endif
+      @endunless
     </div>
+  </div>
   </header>
 
   {{-- Main container --}}
