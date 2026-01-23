@@ -47,6 +47,7 @@
         'tr8_issued' => (clone $statsBase)->where('status','tr8_issued')->count(),
         'arrived'    => (clone $statsBase)->where('status','arrived')->count(),
         'cancelled'  => (clone $statsBase)->where('status','cancelled')->count(),
+        'offloaded'  => (clone $statsBase)->where('status','offloaded')->count(),
     ];
 
     // Needs-attention counts (simple v1 logic; you can refine later)
@@ -266,6 +267,7 @@
                     {!! $pill('Arrived', (int)$stats['arrived'], 'arrived', 'emerald') !!}
                     {!! $pill('Cancelled', (int)$stats['cancelled'], 'cancelled', 'rose') !!}
                     {!! $pill('Offloaded', (int)$stats['offloaded'], 'offloaded', 'gray') !!}
+                    
                 </div>
 
 <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
