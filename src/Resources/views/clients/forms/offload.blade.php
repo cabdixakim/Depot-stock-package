@@ -425,6 +425,11 @@
     modeBadge.classList.toggle('hidden', !isClearance);
     linkModeInput.value = isClearance ? '1' : '0';
 
+    // ✅ BYPASS refs must be here (before the walk-in block), and must run in both modes
+    const bypassPanel = document.getElementById('bypassPanel');
+    const bypassReason = document.getElementById('bypass_reason');
+    const bypassNotes  = document.getElementById('bypass_notes');
+
     if (!isClearance) {
       // reset clearance state (walk-in must be clean)
       unlockClearance();
@@ -438,23 +443,20 @@
       docsList.classList.add('hidden'); docsList.innerHTML = '';
       docsWarn.classList.add('hidden');
       eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
-      return;
+
+      // ✅ show bypass again when returning to walk-in
+      bypassPanel?.classList.remove('hidden');
+
+      // ✅ IMPORTANT: no return here (it was the bug)
+    } else {
+      // load list only once per page session
+      if (!clearanceListLoaded) loadLinkableClearances();
+
+      // hide bypass inputs in clearance mode
+      bypassPanel?.classList.add('hidden');
+      if (bypassReason) bypassReason.value = '';
+      if (bypassNotes)  bypassNotes.value  = '';
     }
-
-    // load list only once per page session
-    if (!clearanceListLoaded) loadLinkableClearances();
-
-    const bypassPanel = document.getElementById('bypassPanel');
-  const bypassReason = document.getElementById('bypass_reason');
-  const bypassNotes  = document.getElementById('bypass_notes');
-
-  if (isClearance) {
-    bypassPanel?.classList.add('hidden');
-    if (bypassReason) bypassReason.value = '';
-    if (bypassNotes)  bypassNotes.value  = '';
-  } else {
-    bypassPanel?.classList.remove('hidden');
-  }
   };
 
   const lockClearance = () => {
