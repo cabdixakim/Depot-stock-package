@@ -718,4 +718,416 @@
   });
 })();
 </script>
+@endpush@push('scripts')
+<script>
+(() => {
+  const modal    = document.getElementById('offloadModal');
+  const form     = document.getElementById('offloadForm');
+  const openBtn  = document.querySelector('[data-open-offload]');
+  const closeEls = modal.querySelectorAll('[data-offload-close]');
+  const banner   = document.getElementById('offloadFormBanner');
+
+  // Mode UI
+  const btnWalkin     = document.getElementById('btnModeWalkin');
+  const btnClearance  = document.getElementById('btnModeClearance');
+  const modeBadge     = document.getElementById('offloadModeBadge');
+  const modePanel     = document.getElementById('clearanceModePanel');
+  const linkModeInput = document.getElementById('off_link_mode');
+  const clearanceIdEl = document.getElementById('off_clearance_id');
+
+  // Clearance widgets
+  const clearanceSelect   = document.getElementById('off_clearance_select');
+  const clearanceErr      = document.getElementById('clearanceSelectErr');
+  const btnClearanceChange= document.getElementById('btnClearanceChange');
+  const statusPill        = document.getElementById('clearanceStatusPill');
+  const prevTruck         = document.getElementById('clearancePrevTruck');
+  const prevTrailer       = document.getElementById('clearancePrevTrailer');
+  const prevLoaded        = document.getElementById('clearancePrevLoaded');
+  const eligibilityBox    = document.getElementById('clearanceEligibility');
+
+  const docsCount = document.getElementById('docsCount');
+  const docsEmpty = document.getElementById('docsEmpty');
+  const docsList  = document.getElementById('docsList');
+  const docsWarn  = document.getElementById('docsWarn');
+
+  // Offload inputs to autofill
+  const inTruck  = document.getElementById('in_truck');
+  const inTrailer= document.getElementById('in_trailer');
+  const inLoaded = document.getElementById('in_loaded');
+
+  // open/close (same as Load)
+  openBtn?.addEventListener('click', () => modal.classList.remove('hidden'));
+  closeEls.forEach(b => b.addEventListener('click', () => modal.classList.add('hidden')));
+
+  // helpers (same style as Load)
+  const clearErrors = () => {
+    banner.classList.add('hidden'); banner.textContent = '';
+    clearanceErr.classList.add('hidden'); clearanceErr.textContent = '';
+    eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
+    form.querySelectorAll('.err').forEach(e => { e.textContent=''; e.classList.add('hidden'); });
+    form.querySelectorAll('input,select').forEach(el => el.classList.remove('border-red-400','ring-red-300'));
+  };
+  const showFieldError = (name, msg) => {
+    const errEl = form.querySelector(`.err.err-offload-${name}`);
+    const input = form.querySelector(`[name="${name}"]`);
+    if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    if (input) input.classList.add('border-red-400','ring-red-300');
+  };
+  const showBanner = (msg) => {
+    banner.textContent = msg;
+    banner.classList.remove('hidden');
+  };
+
+  // --- Auto-calcs (kept from your version) ---
+  const fv = (n, d=0)=>{ const v=parseFloat(n?.value); return Number.isFinite(v)?v:d; };
+  const $  = (sel, root=form) => root.querySelector(sel);
+
+  const elObs   = $('#in_observed');
+  const elTemp  = $('#in_temp');
+  const elRho   = $('#in_density');
+  const elCvf   = $('#in_cvf');
+  const elLoad  = $('#in_loaded');
+  const elDel   = $('#in_delivered');
+  const elAllow = $('#in_allow');
+  const elShort = $('#in_short');
+
+  let manualDelivered = false;
+  elDel?.addEventListener('input', () => { manualDelivered = true; recalc(); });
+
+  function estCVF(t,r){
+    const k=0.00065, base=0.825, rel = r? (r/base):1, fac = 1 - k*(t-20);
+    return Math.max(0.90, Math.min(1.02, rel*fac));
+  }
+  function recalc(){
+    const obs=fv(elObs), t=fv(elTemp), rho=fv(elRho), load=fv(elLoad);
+    if(!manualDelivered){
+      const cvf = elCvf?.value ? fv(elCvf) : estCVF(t,rho);
+      const delivered = obs * cvf;
+      if(elDel) elDel.value = delivered ? delivered.toFixed(3) : '';
+    }
+    const delivered = fv(elDel);
+    if(elAllow) elAllow.value = (delivered * 0.003).toFixed(3);
+    if(elShort) elShort.value = Math.max(load - delivered, 0).toFixed(3);
+  }
+  ['input','change'].forEach(evt => [elObs,elTemp,elRho,elCvf,elLoad].forEach(el=>el?.addEventListener(evt,recalc)));
+  recalc();
+
+  // -------------------------------
+  // Compliance mode (Link Clearance)
+  // -------------------------------
+  let clearanceListLoaded = false;
+
+  const setMode = (mode) => {
+    const isClearance = mode === 'clearance';
+
+    // toggle button styling
+    btnWalkin.classList.toggle('bg-gray-900', !isClearance);
+    btnWalkin.classList.toggle('text-white', !isClearance);
+    btnWalkin.classList.toggle('text-gray-700', isClearance);
+    btnWalkin.classList.toggle('hover:bg-gray-100', isClearance);
+
+    btnClearance.classList.toggle('bg-gray-900', isClearance);
+    btnClearance.classList.toggle('text-white', isClearance);
+    btnClearance.classList.toggle('text-gray-700', !isClearance);
+    btnClearance.classList.toggle('hover:bg-gray-100', !isClearance);
+
+    modePanel.classList.toggle('hidden', !isClearance);
+    modeBadge.classList.toggle('hidden', !isClearance);
+    linkModeInput.value = isClearance ? '1' : '0';
+
+    // ✅ BYPASS refs must be here (before the walk-in block), and must run in both modes
+    const bypassPanel = document.getElementById('bypassPanel');
+    const bypassReason = document.getElementById('bypass_reason');
+    const bypassNotes  = document.getElementById('bypass_notes');
+
+    if (!isClearance) {
+      // reset clearance state (walk-in must be clean)
+      unlockClearance();
+      clearanceIdEl.value = '';
+      statusPill.classList.add('hidden'); statusPill.textContent = '—';
+      prevTruck.textContent = '—';
+      prevTrailer.textContent = '—';
+      prevLoaded.textContent = '—';
+      docsCount.textContent = '0 files';
+      docsEmpty.classList.remove('hidden');
+      docsList.classList.add('hidden'); docsList.innerHTML = '';
+      docsWarn.classList.add('hidden');
+      eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
+
+      // ✅ show bypass again when returning to walk-in
+      bypassPanel?.classList.remove('hidden');
+
+      // ✅ IMPORTANT: no return here (it was the bug)
+    } else {
+      // load list only once per page session
+      if (!clearanceListLoaded) loadLinkableClearances();
+
+      // hide bypass inputs in clearance mode
+      bypassPanel?.classList.add('hidden');
+      if (bypassReason) bypassReason.value = '';
+      if (bypassNotes)  bypassNotes.value  = '';
+    }
+  };
+
+  const lockClearance = () => {
+    clearanceSelect.disabled = true;
+    btnClearanceChange.classList.remove('hidden');
+  };
+  const unlockClearance = () => {
+    clearanceSelect.disabled = false;
+    btnClearanceChange.classList.add('hidden');
+    clearanceSelect.value = '';
+    clearanceIdEl.value = '';
+  };
+
+  btnWalkin?.addEventListener('click', () => setMode('walkin'));
+  btnClearance?.addEventListener('click', () => setMode('clearance'));
+  btnClearanceChange?.addEventListener('click', () => {
+    unlockClearance();
+    // Keep panel visible; just clear preview + docs
+    statusPill.classList.add('hidden'); statusPill.textContent = '—';
+    prevTruck.textContent = '—';
+    prevTrailer.textContent = '—';
+    prevLoaded.textContent = '—';
+    eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
+    docsCount.textContent = '0 files';
+    docsEmpty.classList.remove('hidden');
+    docsList.classList.add('hidden'); docsList.innerHTML = '';
+    docsWarn.classList.add('hidden');
+  });
+
+  async function loadLinkableClearances() {
+    const listUrl = modal.dataset.clearanceListUrl;
+    clearanceSelect.innerHTML = `<option value="">Loading clearances…</option>`;
+    clearanceSelect.disabled = true;
+
+    try {
+      const url = new URL(listUrl, window.location.origin);
+      url.searchParams.set('client_id', '{{ $client->id }}');
+
+      const res = await fetch(url.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      });
+
+      if (!res.ok) throw new Error('Failed to load clearances');
+
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : (data.data || data.rows || []);
+
+      clearanceSelect.innerHTML = `<option value="">Select clearance…</option>`;
+      rows.forEach(r => {
+        const id = r.id ?? r.clearance_id;
+        const truck = r.truck_number ?? r.truck_plate ?? '';
+        const trailer = r.trailer_number ?? r.trailer_plate ?? '';
+        const label = [truck, trailer].filter(Boolean).join(' • ') || (`Clearance #${id}`);
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = label;
+        clearanceSelect.appendChild(opt);
+      });
+
+      clearanceSelect.disabled = false;
+      clearanceListLoaded = true;
+    } catch (e) {
+      clearanceSelect.innerHTML = `<option value="">Could not load clearances</option>`;
+      clearanceSelect.disabled = true;
+      clearanceErr.textContent = 'Failed to load clearances for this client.';
+      clearanceErr.classList.remove('hidden');
+    }
+  }
+
+  clearanceSelect?.addEventListener('change', async () => {
+    clearErrors();
+
+    const id = clearanceSelect.value;
+    if (!id) return;
+
+    // lock selection instantly
+    lockClearance();
+    clearanceIdEl.value = id;
+
+    // fetch preview
+    const tpl = modal.dataset.clearancePreviewUrl;
+    const url = tpl.replace('__ID__', encodeURIComponent(id));
+
+    // reset preview UI while loading
+    statusPill.classList.add('hidden');
+    prevTruck.textContent = '…';
+    prevTrailer.textContent = '…';
+    prevLoaded.textContent = '…';
+    docsCount.textContent = '…';
+    docsEmpty.classList.remove('hidden');
+    docsList.classList.add('hidden'); docsList.innerHTML = '';
+    docsWarn.classList.add('hidden');
+    eligibilityBox.classList.add('hidden'); eligibilityBox.textContent = '';
+
+    try {
+      const res = await fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error('Preview failed');
+
+      const p = await res.json();
+
+      // Eligibility message (server can compute can_link + reason)
+      if (p.can_link === false) {
+        eligibilityBox.textContent = p.reason || 'This clearance cannot be linked.';
+        eligibilityBox.classList.remove('hidden');
+      }
+
+      // Status pill
+      if (p.status) {
+        statusPill.textContent = String(p.status).replaceAll('_',' ').toUpperCase();
+        statusPill.classList.remove('hidden');
+      }
+
+      // Populate preview + form
+      const truck = p.truck_number ?? p.truck_plate ?? '';
+      const trailer = p.trailer_number ?? p.trailer_plate ?? '';
+      const loaded20 = p.loaded_20_l ?? p.loaded_at_20 ?? p.loaded_qty ?? null;
+
+      prevTruck.textContent = truck || '—';
+      prevTrailer.textContent = trailer || '—';
+      prevLoaded.textContent = (loaded20 !== null && loaded20 !== undefined && loaded20 !== '') ? Number(loaded20).toLocaleString() : '—';
+
+      // Autofill form fields (editable)
+      if (truck && inTruck) inTruck.value = truck;
+      if (trailer && inTrailer) inTrailer.value = trailer;
+      if (loaded20 !== null && loaded20 !== undefined && loaded20 !== '' && inLoaded) {
+        inLoaded.value = Number(loaded20).toFixed(3);
+        recalc();
+      }
+
+      // Docs
+      const docs = Array.isArray(p.documents) ? p.documents : [];
+      docsCount.textContent = `${docs.length} file${docs.length === 1 ? '' : 's'}`;
+
+      if (!docs.length) {
+        docsEmpty.classList.add('hidden');
+        docsList.classList.add('hidden');
+        docsWarn.classList.remove('hidden');
+      } else {
+        docsWarn.classList.add('hidden');
+        docsEmpty.classList.add('hidden');
+        docsList.classList.remove('hidden');
+        docsList.innerHTML = '';
+
+        docs.forEach(d => {
+          const li = document.createElement('li');
+          li.className = 'py-2 flex items-center justify-between gap-3';
+
+          const left = document.createElement('div');
+          left.className = 'min-w-0';
+
+          const name = document.createElement('div');
+          name.className = 'text-sm font-semibold text-gray-900 truncate';
+          name.textContent = d.original_name || d.name || d.filename || 'Document';
+
+          const meta = document.createElement('div');
+          meta.className = 'text-xs text-gray-500';
+          meta.textContent = (d.type || 'document').toString().replaceAll('_',' ');
+
+          left.appendChild(name);
+          left.appendChild(meta);
+
+          const right = document.createElement('div');
+          right.className = 'shrink-0 flex items-center gap-2';
+
+          // Prefer server-provided URLs (best)
+          const viewUrl = d.open_url || d.url_view || d.url || null;
+
+          const a = document.createElement('a');
+          a.className = 'px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700';
+          a.textContent = 'View';
+          a.target = '_blank';
+          a.rel = 'noopener';
+          if (viewUrl) a.href = viewUrl;
+          else a.href = '#';
+
+          right.appendChild(a);
+
+          li.appendChild(left);
+          li.appendChild(right);
+
+          docsList.appendChild(li);
+        });
+      }
+    } catch (e) {
+      clearanceErr.textContent = 'Failed to load clearance preview.';
+      clearanceErr.classList.remove('hidden');
+      unlockClearance();
+    }
+  });
+
+  // Default mode
+  setMode('walkin');
+
+  // --- Submit (identical flow to Load) ---
+  form?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    clearErrors();
+
+    // If in clearance mode, require a selected clearance (client-side, soft; server enforces too)
+    const isLinking = linkModeInput.value === '1';
+    if (isLinking && !clearanceIdEl.value) {
+      clearanceErr.textContent = 'Select a clearance to link.';
+      clearanceErr.classList.remove('hidden');
+      showBanner('Clearance link is enabled. Please select a clearance.');
+      return;
+    }
+
+    // Soft client-side warnings (doesn't block submit)
+    const date  = form.querySelector('[name="date"]').value.trim();
+    const tank  = form.querySelector('[name="tank_id"]').value.trim();
+    const del20 = form.querySelector('[name="delivered_20_l"]').value.trim();
+    let warn = [];
+    if (!date) warn.push('Date is empty.');
+    if (!tank) warn.push('Tank is empty.');
+    if (!del20 || Number(del20) <= 0) warn.push('Delivered @20°C should be > 0.');
+    if (warn.length) showBanner(warn.join(' '));
+
+    const url = form.dataset.url || form.action;
+    const btn = form.querySelector('button[type="submit"]');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    try {
+      const fd = new FormData(form);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-TOKEN': fd.get('_token'),
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json'
+        },
+        body: fd,
+        redirect: 'follow'
+      });
+
+      if (res.status === 422) {
+        const data = await res.json();
+        const errs = data.errors || {};
+        Object.keys(errs).forEach(k => showFieldError(k, errs[k][0] || 'Invalid'));
+        if (data.message) showBanner(data.message);
+        btn.disabled = false; btn.textContent = original;
+        return;
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        showBanner(text || 'Failed to save (server error).');
+        btn.disabled = false; btn.textContent = original;
+        return;
+      }
+
+      // Success: close + reload (like Load)
+      modal.classList.add('hidden');
+      location.reload();
+    } catch (e) {
+      showBanner('Network error. Please try again.');
+      btn.disabled = false; btn.textContent = original;
+    }
+  });
+})();
+</script>
 @endpush
