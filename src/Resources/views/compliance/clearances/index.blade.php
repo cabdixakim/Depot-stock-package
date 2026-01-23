@@ -291,6 +291,7 @@
                 <option value="tr8_issued" @selected($fStatus==='tr8_issued')>TR8 issued</option>
                 <option value="arrived" @selected($fStatus==='arrived')>Arrived</option>
                 <option value="cancelled" @selected($fStatus==='cancelled')>Cancelled</option>
+                <option value="offloaded" @selected($fStatus==='offloaded')>Offloaded</option>
             </select>
         </div>
 
