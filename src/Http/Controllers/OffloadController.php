@@ -11,6 +11,7 @@ use Optima\DepotStock\Models\Offload;
 use Optima\DepotStock\Models\Tank;
 use Optima\DepotStock\Models\DepotPoolEntry as DPE;
 use Illuminate\Support\Arr;
+use Illuminate\Http\Request;  
 
 class OffloadController extends Controller
 {
