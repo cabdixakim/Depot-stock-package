@@ -68,25 +68,33 @@
           </svg>
         </button>
 
-        {{-- Brand: centred on mobile, normal on md+ --}}
-        @if($isPureOps)
-          <span
-            class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start"
-          >
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
-            </svg>
-            Depot Stock
-          </span>
-        @else
-          <a href="{{ route('depot.dashboard') }}"
-             class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
-            </svg>
-            Depot Stock
-          </a>
-        @endif
+      {{-- Brand: centred on mobile, normal on md+ --}}
+      @if($isPureOps)
+        <span class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
+          </svg>
+          Depot Stock
+        </span>
+
+      @elseif($isPureCompliance)
+        <a href="{{ route('depot.compliance.clearances.index') }}"
+          class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
+          </svg>
+          Depot Stock
+        </a>
+
+      @else
+        <a href="{{ route('depot.dashboard') }}"
+          class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
+          </svg>
+          Depot Stock
+        </a>
+      @endif
 
       {{-- Main nav gated by roles (desktop only) --}}
       <nav class="hidden md:flex items-center gap-1">
