@@ -265,6 +265,7 @@
                     {!! $pill('TR8 Issued', (int)$stats['tr8_issued'], 'tr8_issued', 'blue') !!}
                     {!! $pill('Arrived', (int)$stats['arrived'], 'arrived', 'emerald') !!}
                     {!! $pill('Cancelled', (int)$stats['cancelled'], 'cancelled', 'rose') !!}
+                    {!! $pill('Offloaded', (int)$stats['offloaded'], 'offloaded', 'gray') !!}
                 </div>
 
 <form method="GET" class="mt-4 rounded-2xl border border-gray-200 bg-white p-3">
