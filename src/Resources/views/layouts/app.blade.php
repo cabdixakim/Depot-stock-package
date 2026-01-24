@@ -55,8 +55,8 @@
 
   {{-- Top Bar --}}
   <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
-    <div class="mx-auto max-w-7xl px-4 md:px-6 h-14 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+    <div class="mx-auto max-w-7xl px-4 md:px-6 h-14 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
         {{-- Mobile menu toggle (left) --}}
         <button
           id="mobileNavToggle"
@@ -96,54 +96,48 @@
         </a>
       @endif
 
-      {{-- Main nav gated by roles (desktop only) --}}
-      <nav class="hidden md:flex items-center gap-1">
-        {{-- Main app links: hidden for pure ops AND pure compliance --}}
-        @unless($isPureOps || $isPureCompliance)
-          {{-- Everyone --}}
-          <a href="{{ route('depot.dashboard') }}" class="navlink">Dashboard</a>
+  <nav class="hidden md:flex items-center gap-1 min-w-0 flex-1 justify-start">
+    <div class="navwrap">
+      {{-- Main app links: hidden for pure ops AND pure compliance --}}
+      @unless($isPureOps || $isPureCompliance)
+        <a href="{{ route('depot.dashboard') }}" class="navlink">Dashboard</a>
 
-          {{-- Ops + Accounts + Admin --}}
-          @if($isAdmin || $isAccounts || $isOps)
-            <a href="{{ route('depot.clients.index') }}" class="navlink">Clients</a>
-          @endif
-
-          {{-- Accounts + Admin --}}
-          @if($isAccounts || $isAdmin)
-            <a href="{{ route('depot.invoices.index') }}" class="navlink">Invoices</a>
-            <a href="{{ route('depot.payments.index') }}" class="navlink">Payments</a>
-          @endif
-
-          {{-- Admin + Accounts --}}
-          @if($isAdmin || $isAccounts)
-            <a href="{{ route('depot.pool.index') }}" class="navlink">Depot Pool</a>
-          @endif
-        @endunless
-
-        {{-- Compliance link (admin/accounts/compliance can see it) --}}
-        @if($isAdmin || $isAccounts || $isCompliance)
-          <a href="{{ route('depot.compliance.clearances.index') }}" class="navlink">Compliance</a>
+        @if($isAdmin || $isAccounts || $isOps)
+          <a href="{{ route('depot.clients.index') }}" class="navlink">Clients</a>
         @endif
 
-        {{-- Depot operations: only for ops/admin/accounts, NOT for pure compliance --}}
-        @unless($isPureCompliance)
-          @if($isAdmin || $isAccounts || $isOps)
-            @php
-              $isDepotOps = str_starts_with(request()->route()?->getName() ?? '', 'depot.operations.');
-            @endphp
+        @if($isAccounts || $isAdmin)
+          <a href="{{ route('depot.invoices.index') }}" class="navlink">Invoices</a>
+          <a href="{{ route('depot.payments.index') }}" class="navlink">Payments</a>
+        @endif
 
-            <a href="{{ route('depot.operations.index') }}"
-              class="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium
-                  {{ $isDepotOps ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
-              <svg class="h-4 w-4 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M4 7h16M4 12h10M4 17h7M17 10l3 2-3 2" />
-              </svg>
-              <span>Depot operations</span>
-            </a>
-          @endif
-        @endunless
-      </nav>
+        @if($isAdmin || $isAccounts)
+          <a href="{{ route('depot.pool.index') }}" class="navlink">Depot Pool</a>
+        @endif
+      @endunless
+
+      @if($isAdmin || $isAccounts || $isCompliance)
+        <a href="{{ route('depot.compliance.clearances.index') }}" class="navlink">Compliance</a>
+      @endif
+
+      @unless($isPureCompliance)
+        @if($isAdmin || $isAccounts || $isOps)
+          @php
+            $isDepotOps = str_starts_with(request()->route()?->getName() ?? '', 'depot.operations.');
+          @endphp
+
+          <a href="{{ route('depot.operations.index') }}"
+            class="navlink navlink--withicon {{ $isDepotOps ? 'navlink--active' : '' }}">
+            <svg class="h-4 w-4 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M4 7h16M4 12h10M4 17h7M17 10l3 2-3 2" />
+            </svg>
+            <span>Depot operations</span>
+          </a>
+        @endif
+      @endunless
+    </div>
+  </nav>
       </div>
 
       <div class="flex items-center gap-2">
@@ -621,15 +615,23 @@
 
   {{-- Global helpers --}}
   <script>
-    // ---------- Topbar active link style ----------
-    (function() {
-      const path = location.pathname;
-      document.querySelectorAll('.navlink').forEach(a => {
-        const href = a.getAttribute('href') || '';
-        const isActive = href && path.startsWith(href);
-        a.className = 'navlink ' + (isActive ? 'navlink--active' : '');
-      });
-    })();
+
+  // ---------- Topbar active link style ----------
+  (function() {
+    const path = location.pathname;
+
+    document.querySelectorAll('a.navlink').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      if (!href) return;
+
+      const isActive = path === href || (href !== '/' && path.startsWith(href));
+
+      a.classList.toggle('navlink--active', isActive);
+      if (isActive) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  })();
+
 
     // ---------- Mobile nav toggle ----------
     (function () {
@@ -961,16 +963,53 @@ document.addEventListener('keydown', (e) => {
   @stack('scripts')
 
   {{-- Inline small CSS for navlink --}}
-  <style>
-    .navlink {
-      padding: .5rem .75rem;
-      border-radius: .75rem;
-      font-size: .875rem;
-      color: #6b7280; /* gray-500 */
-    }
-    .navlink:hover { color:#111827; background:#F3F4F6; }
-    .navlink--active { color:#111827; background:#EEF2FF; } /* indigo-50 */
-  </style>
+<style>
+  /* Premium “pill bar” */
+  .navwrap{
+    display:flex;
+    align-items:center;
+    gap:.25rem;
+    padding:.25rem;
+    border:1px solid rgba(229,231,235,.8);
+    background: rgba(249,250,251,.9);
+    border-radius: 9999px;
+    box-shadow: 0 1px 0 rgba(17,24,39,.04);
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .navwrap::-webkit-scrollbar{ display:none; }
+  .navwrap{ scrollbar-width:none; }
+
+  .navlink{
+    display:inline-flex;
+    align-items:center;
+    gap:.375rem;
+    padding:.45rem .7rem;
+    border-radius: 9999px;
+    font-size: .8125rem;
+    font-weight: 600;
+    color:#6b7280;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+    outline: none;
+  }
+  .navlink:hover{
+    color:#111827;
+    background: rgba(243,244,246,.9);
+  }
+  .navlink:focus-visible{
+    box-shadow: 0 0 0 3px rgba(99,102,241,.25);
+  }
+
+  .navlink--active{
+    color:#111827;
+    background: rgba(238,242,255,.95);
+    box-shadow: inset 0 0 0 1px rgba(199,210,254,.8);
+  }
+
+  .navlink--withicon svg{ flex:0 0 auto; }
+</style>
 
   <script>
     if ('serviceWorker' in navigator) {
