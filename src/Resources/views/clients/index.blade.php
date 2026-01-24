@@ -20,10 +20,13 @@
 
 <div class="min-h-[100dvh] bg-[#F7FAFC]">
 
-  {{-- ===== Sticky Header ===== --}}
-  <div class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100">
-    <div class="mx-auto max-w-7xl px-4 md:px-6 h-14 flex items-center justify-between gap-3">
-      <div class="leading-tight">
+{{-- ===== Sticky Header ===== --}}
+<div class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100">
+  <div class="mx-auto max-w-7xl px-4 md:px-6 py-3 sm:py-0 sm:h-14 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+    {{-- Left: Title --}}
+    <div class="leading-tight flex items-start justify-between gap-3 sm:block">
+      <div>
         <div class="text-[11px] uppercase tracking-wide text-slate-500">
           Clients
         </div>
@@ -32,79 +35,103 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <form method="GET" class="flex items-center gap-2">
-          <div class="relative">
-            <input
-              type="text"
-              name="q"
-              value="{{ $q ?? '' }}"
-              placeholder="Search client, code, email…"
-              class="h-9 w-48 sm:w-72 rounded-xl border border-slate-200 bg-slate-50 px-8 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
-            <span class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="11" cy="11" r="6" stroke-width="1.7"/>
-                <path d="M16 16l4 4" stroke-width="1.7" stroke-linecap="round"/>
-              </svg>
-            </span>
-          </div>
+      {{-- Mobile: keep New Client visible beside title --}}
+      @if($canManage)
+        <button
+          type="button"
+          id="clientCreateOpen"
+          class="sm:hidden inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3 py-2 text-[11px] font-medium hover:bg-black shadow-sm whitespace-nowrap">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 5v14M5 12h14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          New client
+        </button>
+      @endif
+    </div>
 
-          {{-- Product filter (NEW) --}}
-          <div class="hidden sm:block">
-            <select name="product"
-              class="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
-              <option value="all" @selected($activeProductId === null)>All products</option>
-              @foreach($products as $p)
-                <option value="{{ $p->id }}" @selected((int)($activeProductId ?? 0) === (int)$p->id)>
-                  {{ $p->name }}
-                </option>
-              @endforeach
-            </select>
-          </div>
+    {{-- Right: Filters + New Client (desktop) --}}
+    <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
 
+      <form method="GET" class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+        {{-- Search (full width on mobile) --}}
+        <div class="relative w-full sm:w-auto">
+          <input
+            type="text"
+            name="q"
+            value="{{ $q ?? '' }}"
+            placeholder="Search client, code, email…"
+            class="h-10 sm:h-9 w-full sm:w-72 rounded-xl border border-slate-200 bg-slate-50 px-8 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
+          <span class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="11" cy="11" r="6" stroke-width="1.7"/>
+              <path d="M16 16l4 4" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </span>
+        </div>
+
+        {{-- Product filter (desktop/tablet inline, mobile below in separate row) --}}
+        <div class="hidden sm:block">
+          <select name="product"
+            class="h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
+            <option value="all" @selected($activeProductId === null)>All products</option>
+            @foreach($products as $p)
+              <option value="{{ $p->id }}" @selected((int)($activeProductId ?? 0) === (int)$p->id)>
+                {{ $p->name }}
+              </option>
+            @endforeach
+          </select>
+        </div>
+
+        {{-- Actions (visible on mobile too) --}}
+        <div class="flex items-center gap-2">
           <button
             type="submit"
-            class="hidden sm:inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50">
+            class="inline-flex h-10 sm:h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50">
             Apply
           </button>
 
           <a href="{{ route('depot.clients.index') }}"
-             class="hidden sm:inline-flex text-[11px] text-slate-500 hover:text-slate-700">
+             class="inline-flex h-10 sm:h-9 items-center justify-center rounded-xl border border-transparent px-2 text-[12px] text-slate-500 hover:text-slate-700">
             Reset
           </a>
-        </form>
-
-        @if($canManage)
-          <button
-            type="button"
-            id="clientCreateOpen"
-            class="inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3 py-1.5 text-[11px] font-medium hover:bg-black shadow-sm">
-            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 5v14M5 12h14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            New client
-          </button>
-        @endif
-      </div>
-    </div>
-
-    {{-- Mobile product filter row (NEW) --}}
-    <div class="sm:hidden px-4 pb-3">
-      <form method="GET" class="flex gap-2">
-        <input type="hidden" name="q" value="{{ $q ?? '' }}">
-        <select name="product"
-          class="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
-          <option value="all" @selected($activeProductId === null)>All products</option>
-          @foreach($products as $p)
-            <option value="{{ $p->id }}" @selected((int)($activeProductId ?? 0) === (int)$p->id)>
-              {{ $p->name }}
-            </option>
-          @endforeach
-        </select>
-        <button class="h-9 rounded-xl bg-slate-900 px-3 text-sm text-white">Go</button>
+        </div>
       </form>
+
+      {{-- Desktop New Client --}}
+      @if($canManage)
+        <button
+          type="button"
+          id="clientCreateOpen"
+          class="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3 py-1.5 text-[11px] font-medium hover:bg-black shadow-sm whitespace-nowrap">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 5v14M5 12h14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          New client
+        </button>
+      @endif
+
     </div>
   </div>
+
+  {{-- Mobile product filter row --}}
+  <div class="sm:hidden px-4 pb-3">
+    <form method="GET" class="flex gap-2">
+      <input type="hidden" name="q" value="{{ $q ?? '' }}">
+      <select name="product"
+        class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-0">
+        <option value="all" @selected($activeProductId === null)>All products</option>
+        @foreach($products as $p)
+          <option value="{{ $p->id }}" @selected((int)($activeProductId ?? 0) === (int)$p->id)>
+            {{ $p->name }}
+          </option>
+        @endforeach
+      </select>
+      <button type="submit" class="h-10 rounded-xl bg-slate-900 px-4 text-sm text-white whitespace-nowrap">
+        Go
+      </button>
+    </form>
+  </div>
+</div>
 
   {{-- ===== Body ===== --}}
   <div class="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-5">
