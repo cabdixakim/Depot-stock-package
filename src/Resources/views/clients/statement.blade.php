@@ -25,22 +25,26 @@
 
     {{-- Filter + Export Bar --}}
     <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 p-4">
+      {{-- Keep your original structure; only fix layout behaviour --}}
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
 
-        {{-- Quick presets (LEFT) --}}
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-[11px] uppercase tracking-wide text-slate-500 mr-1">Quick range</span>
+        {{-- Quick presets (LEFT) — single-line, scrollable, never wraps --}}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-[11px] uppercase tracking-wide text-slate-500 mr-1 shrink-0">Quick range</span>
 
-          {{-- ✅ keep compact chips; just add the missing ones --}}
-          <button type="button" class="chip" data-preset="this-month">This month</button>
-          <button type="button" class="chip" data-preset="this-year">This year</button>
-          <button type="button" class="chip" data-preset="last-month">Last month</button>
-          <button type="button" class="chip" data-preset="last-year">Last year</button>
-          <button type="button" class="chip" data-preset="all-time">All time</button>
+            <div class="chips-row min-w-0 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+              <button type="button" class="chip" data-preset="this-month">This month</button>
+              <button type="button" class="chip" data-preset="this-year">This year</button>
+              <button type="button" class="chip" data-preset="last-month">Last month</button>
+              <button type="button" class="chip" data-preset="last-year">Last year</button>
+              <button type="button" class="chip" data-preset="all-time">All time</button>
+            </div>
+          </div>
         </div>
 
-        {{-- Date range + actions (RIGHT) --}}
-        <form id="flt" class="ml-auto flex flex-wrap items-end gap-3">
+        {{-- Date range + actions (RIGHT) — pinned right, never collapses into the left --}}
+        <form id="flt" class="ml-auto shrink-0 flex flex-wrap items-end gap-3">
           <div>
             <label class="block text-[11px] uppercase tracking-wide text-slate-500">From</label>
             <input type="date" name="from" value="{{ $from }}"
@@ -185,6 +189,10 @@
 
 @push('styles')
 <style>
+  /* hide scrollbars but keep scroll */
+  .chips-row::-webkit-scrollbar { display:none; }
+  .chips-row { -ms-overflow-style:none; scrollbar-width:none; }
+
   .chip {
     border-radius: 9999px;
     border: 1px solid rgb(226 232 240);
@@ -193,6 +201,7 @@
     font-size: 0.75rem;
     color: rgb(71 85 105);
     transition: background .15s ease, box-shadow .15s ease, border-color .15s ease;
+    flex: 0 0 auto; /* critical: never shrink into weird widths */
   }
   .chip:hover {
     background: rgb(248 250 252);
@@ -227,6 +236,7 @@
   const btnApply = $('#btnApply');
   const btnReset = $('#btnReset');
 
+  // Preset chips
   const chips = $$('.chip[data-preset]');
   const pad = n => n.toString().padStart(2,'0');
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -300,14 +310,16 @@
     });
   });
 
+  // Reset to initial server defaults
   btnReset.addEventListener('click', ()=>{
-    fromEl.value = initialFrom;
-    toEl.value   = initialTo;
+    fromEl.value   = initialFrom;
+    toEl.value     = initialTo;
     unpaidEl.checked = false;
     syncActiveChip();
     load();
   });
 
+  // KPIs + meta
   const tOpen  = $('#t_open');
   const tChg   = $('#t_chg');
   const tCr    = $('#t_cr');
@@ -315,6 +327,7 @@
   const meta   = $('#metaRange');
   const body   = $('#ledgerBody');
 
+  // Export buttons
   const btnCsv   = $('#btnExportCsv');
   const btnPrint = $('#btnPrint');
 
@@ -329,13 +342,16 @@
   }
 
   btnCsv?.addEventListener('click', ()=>{
-    window.location = `${routeExport}?${buildQs({format:'csv'})}`;
+    const qs = buildQs({format:'csv'});
+    window.location = `${routeExport}?${qs}`;
   });
 
   btnPrint?.addEventListener('click', ()=>{
-    window.open(`${routeExport}?${buildQs({format:'print'})}`, '_blank');
+    const qs = buildQs({format:'print'});
+    window.open(`${routeExport}?${qs}`, '_blank');
   });
 
+  // Apply
   btnApply?.addEventListener('click', (e)=>{
     e.preventDefault();
     syncActiveChip();
@@ -345,7 +361,8 @@
   async function load(){
     body.innerHTML = `<tr><td colspan="7" class="px-3 py-6 text-center text-slate-500">Loading…</td></tr>`;
     try{
-      const res = await fetch(`${routeData}?${buildQs()}`, {headers:{'Accept':'application/json'}});
+      const qs  = buildQs();
+      const res = await fetch(`${routeData}?${qs}`, {headers:{'Accept':'application/json'}});
       const data = await res.json();
 
       const opening = +data.opening || 0;
@@ -358,7 +375,8 @@
       tCr.textContent    = fmt2.format(credits);
       tClose.textContent = fmt2.format(closing);
 
-      meta.textContent = `${data.from} → ${data.to}` + (data.unpaid ? ' • unpaid invoices only' : '');
+      const unpaid = data.unpaid ? true : false;
+      meta.textContent   = `${data.from} → ${data.to}` + (unpaid ? ' • unpaid invoices only' : '');
 
       const rows = Array.isArray(data.rows) ? data.rows : [];
       if(!rows.length){
@@ -372,9 +390,15 @@
           <td class="px-3 py-2 text-slate-700 whitespace-nowrap">${r.type ?? ''}</td>
           <td class="px-3 py-2 font-mono text-xs text-slate-700 whitespace-nowrap">${r.doc_no ?? ''}</td>
           <td class="px-3 py-2 text-slate-600">${r.description ?? ''}</td>
-          <td class="px-3 py-2 text-right ${(+r.debit||0)?'text-rose-700 font-medium':''}">${fmt2.format(+r.debit||0)}</td>
-          <td class="px-3 py-2 text-right ${(+r.credit||0)?'text-emerald-700 font-medium':''}">${fmt2.format(+r.credit||0)}</td>
-          <td class="px-3 py-2 text-right font-semibold text-indigo-700">${fmt2.format(+r.balance||0)}</td>
+          <td class="px-3 py-2 text-right ${(+r.debit||0)?'text-rose-700 font-medium':''}">
+            ${fmt2.format(+r.debit||0)}
+          </td>
+          <td class="px-3 py-2 text-right ${(+r.credit||0)?'text-emerald-700 font-medium':''}">
+            ${fmt2.format(+r.credit||0)}
+          </td>
+          <td class="px-3 py-2 text-right font-semibold text-indigo-700">
+            ${fmt2.format(+r.balance||0)}
+          </td>
         </tr>
       `).join('');
     }catch(e){
@@ -382,6 +406,7 @@
     }
   }
 
+  // Initial load
   syncActiveChip();
   load();
 })();
