@@ -68,79 +68,51 @@
           </svg>
         </button>
 
-{{-- Brand: centred on mobile, normal on md+ --}}
+{{-- Brand: minimal wordmark --}}
 @php
-  $brandName = config('depot-stock.brand.name')
-    ?? config('app.name')
-    ?? 'Depot Stock';
+  $brandName = config('app.name') ?? 'Depot Stock';
 
   $brandTag  = $isPureOps ? 'span' : 'a';
   $brandHref = $isPureCompliance
     ? route('depot.compliance.clearances.index')
     : route('depot.dashboard');
-
-  // optional tiny descriptor (you can delete)
-  $brandTagline = config('depot-stock.brand.tagline') ?? 'Depot • Operations';
 @endphp
 
 <{{ $brandTag }}
   @if($brandTag === 'a') href="{{ $brandHref }}" @endif
   class="flex-1 md:flex-none inline-flex items-center justify-center md:justify-start select-none"
 >
-  <span class="relative inline-flex items-center px-3 py-2">
-    {{-- subtle background glow --}}
-    <span aria-hidden="true"
-          class="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-50/70 via-white to-emerald-50/60 ring-1 ring-black/5 shadow-[0_10px_25px_rgba(15,23,42,0.08)]">
-    </span>
+  <svg
+    viewBox="0 0 900 120"
+    class="h-6 w-auto"
+    role="img"
+    aria-label="{{ $brandName }}"
+  >
+    <defs>
+      <linearGradient id="brandInk" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" stop-color="#0f172a"/>
+        <stop offset="1" stop-color="#1f2937"/>
+      </linearGradient>
+    </defs>
 
-    <span class="relative inline-flex flex-col leading-none">
-      {{-- SCRIPT wordmark --}}
-      <svg viewBox="0 0 1100 120" class="h-7 w-auto" role="img" aria-label="{{ $brandName }}">
-        <defs>
-          <linearGradient id="wmInk" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stop-color="#0f172a"/>
-            <stop offset="0.55" stop-color="#111827"/>
-            <stop offset="1" stop-color="#1f2937"/>
-          </linearGradient>
-
-          <filter id="wmSoft" x="-20%" y="-60%" width="140%" height="220%">
-            <feGaussianBlur stdDeviation="1.2" result="b"/>
-            <feColorMatrix in="b" type="matrix"
-              values="1 0 0 0 0
-                      0 1 0 0 0
-                      0 0 1 0 0
-                      0 0 0 .18 0" result="g"/>
-            <feMerge>
-              <feMergeNode in="g"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-
-        <text x="0" y="78"
-              fill="url(#wmInk)"
-              filter="url(#wmSoft)"
-              font-size="78"
-              font-weight="500"
-              letter-spacing="0.5"
-              font-family='
-                "Segoe Script",
-                "Snell Roundhand",
-                "Apple Chancery",
-                "Brush Script MT",
-                "Lucida Handwriting",
-                cursive
-              '>
-          {{ $brandName }}
-        </text>
-      </svg>
-
-      {{-- small premium subline (stays beautiful even if cursive fallback is meh) --}}
-      <!-- <span class="mt-0.5 text-[10px] uppercase tracking-[0.32em] text-slate-400">
-        {{ $brandTagline }}
-      </span> -->
-    </span>
-  </span>
+    <text
+      x="0"
+      y="78"
+      fill="url(#brandInk)"
+      font-size="72"
+      letter-spacing="0.8"
+      font-weight="500"
+      font-family='
+        "Playfair Display",
+        "Libre Baskerville",
+        "Cormorant Garamond",
+        "Georgia",
+        serif
+      '
+    >
+      {{ $brandName }}
+    </text>
+  </svg>
 </{{ $brandTag }}>
 
   <nav class="hidden md:flex items-center gap-1 min-w-0 flex-1 justify-start">
