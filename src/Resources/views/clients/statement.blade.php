@@ -2,6 +2,10 @@
 @section('title', $client->name . ' • Statement')
 
 @section('content')
+@php
+  $qUnpaid = (bool) request()->query('unpaid', false);
+@endphp
+
 <div class="min-h-[100dvh] bg-[#F7FAFC]">
   {{-- ===== Sticky Header ===== --}}
   <div class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-100">
@@ -30,8 +34,12 @@
         {{-- Quick presets --}}
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-[11px] uppercase tracking-wide text-slate-500 mr-1">Quick range</span>
-          <button type="button" class="chip" data-preset="last-month">Last month</button>
+
+          <button type="button" class="chip" data-preset="this-month">This month</button>
           <button type="button" class="chip" data-preset="this-year">This year</button>
+          <button type="button" class="chip" data-preset="last-month">Last month</button>
+          <button type="button" class="chip" data-preset="last-year">Last year</button>
+          <button type="button" class="chip" data-preset="all-time">All time</button>
         </div>
 
         {{-- Date range + actions --}}
@@ -50,7 +58,8 @@
           <div class="flex flex-col gap-2">
             {{-- Unpaid-only toggle --}}
             <label class="inline-flex items-center gap-2 text-[11px] text-slate-600">
-              <input type="checkbox" name="unpaid"
+              <input type="checkbox" name="unpaid" value="1"
+                     {{ $qUnpaid ? 'checked' : '' }}
                      class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 focus:ring-offset-0">
               <span>Show only unpaid invoices</span>
             </label>
@@ -194,6 +203,12 @@
     box-shadow: 0 1px 4px rgba(148, 163, 184, 0.35);
     border-color: rgb(203 213 225);
   }
+  .chip.is-active {
+    background: rgb(15 23 42);
+    color: #fff;
+    border-color: rgb(15 23 42);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
+  }
 </style>
 @endpush
 
@@ -218,31 +233,91 @@
 
   // Preset chips
   const chips = $$('.chip[data-preset]');
+
+  const pad = n => n.toString().padStart(2,'0');
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const lastOfMonth = (d)=>new Date(d.getFullYear(), d.getMonth()+1, 0);
+
+  function setPreset(preset){
+    const now = new Date();
+
+    if(preset === 'this-month'){
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      fromEl.value = ymd(d);
+      toEl.value   = ymd(now);
+    }
+    else if(preset === 'this-year'){
+      const y = now.getFullYear();
+      fromEl.value = `${y}-01-01`;
+      toEl.value   = ymd(now);
+    }
+    else if(preset === 'last-month'){
+      const lm = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      fromEl.value = ymd(lm);
+      toEl.value   = ymd(lastOfMonth(lm));
+    }
+    else if(preset === 'last-year'){
+      const y = now.getFullYear() - 1;
+      fromEl.value = `${y}-01-01`;
+      toEl.value   = `${y}-12-31`;
+    }
+    else if(preset === 'all-time'){
+      fromEl.value = `1900-01-01`;
+      toEl.value   = ymd(now);
+    }
+  }
+
+  function syncActiveChip(){
+    // mark chip active if its range matches current input (simple exact-match)
+    const f = fromEl.value, t = toEl.value;
+    const now = new Date();
+
+    const thisMonthFrom = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+    const thisMonthTo   = ymd(now);
+
+    const thisYearFrom  = `${now.getFullYear()}-01-01`;
+    const thisYearTo    = ymd(now);
+
+    const lm = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const lastMonthFrom = ymd(lm);
+    const lastMonthTo   = ymd(lastOfMonth(lm));
+
+    const lastYearFrom  = `${now.getFullYear()-1}-01-01`;
+    const lastYearTo    = `${now.getFullYear()-1}-12-31`;
+
+    const allFrom       = `1900-01-01`;
+    const allTo         = ymd(now);
+
+    const match = (pf, pt) => f === pf && t === pt;
+
+    chips.forEach(c => c.classList.remove('is-active'));
+
+    chips.forEach(c=>{
+      const p = c.dataset.preset;
+      if (
+        (p==='this-month' && match(thisMonthFrom, thisMonthTo)) ||
+        (p==='this-year'  && match(thisYearFrom,  thisYearTo))  ||
+        (p==='last-month' && match(lastMonthFrom, lastMonthTo)) ||
+        (p==='last-year'  && match(lastYearFrom,  lastYearTo))  ||
+        (p==='all-time'   && match(allFrom,       allTo))
+      ) c.classList.add('is-active');
+    });
+  }
+
   chips.forEach(c=>{
     c.addEventListener('click', ()=>{
-      const now = new Date();
-      const pad = n => n.toString().padStart(2,'0');
-      const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-      const lastOfMonth  = (d)=>new Date(d.getFullYear(), d.getMonth()+1, 0);
-
-      if(c.dataset.preset === 'last-month'){
-        const lm = new Date(now.getFullYear(), now.getMonth()-1, 1);
-        fromEl.value = ymd(lm);
-        toEl.value   = ymd(lastOfMonth(lm));
-      } else if(c.dataset.preset === 'this-year'){
-        const y = now.getFullYear();
-        fromEl.value = `${y}-01-01`;
-        toEl.value   = ymd(now);
-      }
+      setPreset(c.dataset.preset);
+      syncActiveChip();
       load();
     });
   });
 
   // Reset to initial server defaults
   btnReset.addEventListener('click', ()=>{
-    fromEl.value   = initialFrom;
-    toEl.value     = initialTo;
+    fromEl.value     = initialFrom;
+    toEl.value       = initialTo;
     unpaidEl.checked = false;
+    syncActiveChip();
     load();
   });
 
@@ -281,6 +356,7 @@
   // Apply
   btnApply?.addEventListener('click', (e)=>{
     e.preventDefault();
+    syncActiveChip();
     load();
   });
 
@@ -332,7 +408,8 @@
     }
   }
 
-  // Initial load
+  // Initial
+  syncActiveChip();
   load();
 })();
 </script>

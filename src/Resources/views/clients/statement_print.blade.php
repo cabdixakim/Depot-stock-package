@@ -1,16 +1,43 @@
-{{-- resources/views/vendor/depot-stock/clients/statement/print.blade.php --}}
 @extends('depot-stock::layouts.app')
-
 @section('title', 'Statement — ' . $client->name)
 
 @section('content')
+@php
+  // Brand config with safe fallbacks
+  $brandName =
+      config('depot-stock.brand.name')
+      ?? config('depot-stock.company_name')
+      ?? config('app.name')
+      ?? 'Company';
+
+  $logoCfg =
+      config('depot-stock.brand.logo')
+      ?? config('depot-stock.company_logo')
+      ?? null;
+
+  $logoUrl = null;
+
+  if ($logoCfg) {
+      // URL?
+      if (preg_match('/^https?:\/\//i', $logoCfg)) {
+          $logoUrl = $logoCfg;
+      } else {
+          // Public-relative path?
+          $path = public_path(ltrim($logoCfg, '/'));
+          if (is_file($path)) {
+              $logoUrl = asset(ltrim($logoCfg, '/'));
+          }
+      }
+  }
+@endphp
+
 <style>
   /* ——— Hide any global chrome on this page ——— */
   .sticky.top-0, header, nav, #sideDrawer, #drawerBackdrop { display:none !important; }
 
-  /* Page scaffold (keeps your original design) */
   body { background:#fff; }
   .wrap { max-width:900px; margin:32px auto; padding:0 20px; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#111; }
+
   h1 { margin:0 0 6px; font-size:18px; }
   .muted { color:#666; font-size:12px; }
 
@@ -29,8 +56,40 @@
     background: linear-gradient(180deg, #ffffff 0%, #f7f7fb 100%);
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
-
   .big { font-weight:600; font-size:16px; }
+
+  /* Brand */
+  .brand {
+    display:flex; align-items:center; gap:12px;
+  }
+  .brand img {
+    height:38px; width:auto; border-radius:10px;
+    border:1px solid #eef2f7;
+    box-shadow:0 2px 10px rgba(2,6,23,.06);
+    background:#fff;
+    padding:6px;
+  }
+  .brand-fallback {
+    display:inline-flex; align-items:center;
+    padding:10px 12px;
+    border-radius:12px;
+    color:#fff;
+    font-weight:800;
+    letter-spacing:.06em;
+    font-size:12px;
+    text-transform:uppercase;
+    background: linear-gradient(135deg, #0f172a, #334155);
+    box-shadow:0 6px 20px rgba(2,6,23,.14);
+  }
+  .brand-fallback small {
+    display:block;
+    font-weight:600;
+    letter-spacing:.02em;
+    opacity:.75;
+    text-transform:none;
+    margin-top:2px;
+    font-size:11px;
+  }
 
   /* Pretty buttons */
   #printBtn {
@@ -61,31 +120,39 @@
   #backBtn svg { width:14px; height:14px; stroke-width:2; stroke:#4b5563; }
 
   @media print {
-    #printBtn,
-    #backBtn {
-      display:none;
-    }
+    #printBtn, #backBtn { display:none; }
   }
 </style>
 
 <div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;">
     <div>
-      <h1>Statement</h1>
-      <div class="muted">{{ $client->name }}</div>
-      <div class="muted">{{ $meta['from'] ?? '' }} → {{ $meta['to'] ?? '' }}</div>
+      <div class="brand">
+        @if($logoUrl)
+          <img src="{{ $logoUrl }}" alt="{{ $brandName }}">
+        @else
+          <div class="brand-fallback">
+            {{ $brandName }}
+          </div>
+        @endif
+      </div>
+
+      <div style="margin-top:10px;">
+        <h1>Statement</h1>
+        <div class="muted">{{ $client->name }}</div>
+        <div class="muted">{{ $meta['from'] ?? '' }} → {{ $meta['to'] ?? '' }}</div>
+      </div>
     </div>
 
     <div>
       <a id="backBtn"
-      href="{{ url()->previous() }}"
-      onclick="if (window.history.length > 1) { window.history.back(); return false; }">
+         href="{{ url()->previous() }}"
+         onclick="if (window.history.length > 1) { window.history.back(); return false; }">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round"
-                d="M10 19l-7-7 7-7M3 12h18"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7 7-7M3 12h18"/>
         </svg>
         Back
-    </a>
+      </a>
 
       <a id="printBtn" href="#" onclick="window.print();return false;">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
