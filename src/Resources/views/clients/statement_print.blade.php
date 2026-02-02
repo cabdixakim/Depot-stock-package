@@ -146,7 +146,7 @@
 
         <div>
           <div class="brandWord">{{ $brandName }}</div>
-          <div class="brandSub">Statement</div>
+          <!-- <div class="brandSub">Statement</div> -->
         </div>
       </div>
     </div>
