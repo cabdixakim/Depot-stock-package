@@ -2,67 +2,21 @@
 @section('title', $client->name . ' • Statement')
 
 @section('content')
-@php
-  // Brand (centre header)
-  $brandName =
-      config('depot-stock.brand.name')
-      ?? config('depot-stock.company_name')
-      ?? config('app.name')
-      ?? 'Company';
-
-  $logoCfg =
-      config('depot-stock.brand.logo')
-      ?? config('depot-stock.company_logo')
-      ?? null;
-
-  $logoUrl = null;
-  if ($logoCfg) {
-    if (preg_match('/^https?:\/\//i', $logoCfg)) {
-      $logoUrl = $logoCfg;
-    } else {
-      $path = public_path(ltrim($logoCfg, '/'));
-      if (is_file($path)) $logoUrl = asset(ltrim($logoCfg, '/'));
-    }
-  }
-
-  $qUnpaid = (bool) request()->query('unpaid', false);
-@endphp
-
 <div class="min-h-[100dvh] bg-[#F7FAFC]">
   {{-- ===== Sticky Header ===== --}}
   <div class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-100">
-    <div class="mx-auto max-w-7xl px-4 md:px-6 h-14 grid grid-cols-3 items-center">
-      {{-- Left: client info --}}
-      <div class="leading-tight justify-self-start">
+    <div class="mx-auto max-w-7xl px-4 md:px-6 h-14 flex items-center justify-between">
+      <div class="leading-tight">
         <div class="text-[11px] uppercase tracking-wide text-slate-500">Client Statement</div>
         <div class="font-semibold text-slate-900">{{ $client->name }}</div>
-        <div class="text-[11px] text-slate-500">Closing = Opening + Charges − Credits</div>
-      </div>
-
-      {{-- Center: brand --}}
-      <div class="justify-self-center">
-        <div class="inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 bg-slate-50/70 ring-1 ring-slate-200/70 shadow-sm">
-          @if($logoUrl)
-            <img src="{{ $logoUrl }}" alt="{{ $brandName }}" class="h-6 w-auto rounded-md">
-          @else
-            <svg viewBox="0 0 24 24" class="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 4v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7l8-4z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"/>
-            </svg>
-            <span class="text-[12px] font-extrabold tracking-wide text-slate-800 uppercase">
-              {{ $brandName }}
-            </span>
-          @endif
+        <div class="text-[11px] text-slate-500">
+          Closing = Opening + Charges − Credits
         </div>
       </div>
-
-      {{-- Right: back --}}
-      <div class="justify-self-end">
-        <a href="{{ route('depot.clients.show', $client) }}"
-           class="hidden md:inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50">
-          ← Back
-        </a>
-      </div>
+      <a href="{{ route('depot.clients.show', $client) }}"
+         class="hidden md:inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50">
+        ← Back
+      </a>
     </div>
   </div>
 
@@ -71,37 +25,37 @@
 
     {{-- Filter + Export Bar --}}
     <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 p-4">
-      <div class="grid gap-4 lg:grid-cols-[auto,1fr] lg:items-end">
-        {{-- Left: quick presets (compact, scroll on small) --}}
-        <div>
-          <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Quick range</div>
-          <div class="-mx-1 px-1 flex items-center gap-2 overflow-x-auto whitespace-nowrap no-scrollbar">
-            <button type="button" class="chip" data-preset="this-month">This month</button>
-            <button type="button" class="chip" data-preset="this-year">This year</button>
-            <button type="button" class="chip" data-preset="last-month">Last month</button>
-            <button type="button" class="chip" data-preset="last-year">Last year</button>
-            <button type="button" class="chip" data-preset="all-time">All time</button>
-          </div>
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
+
+        {{-- Quick presets (LEFT) --}}
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-[11px] uppercase tracking-wide text-slate-500 mr-1">Quick range</span>
+
+          {{-- ✅ keep compact chips; just add the missing ones --}}
+          <button type="button" class="chip" data-preset="this-month">This month</button>
+          <button type="button" class="chip" data-preset="this-year">This year</button>
+          <button type="button" class="chip" data-preset="last-month">Last month</button>
+          <button type="button" class="chip" data-preset="last-year">Last year</button>
+          <button type="button" class="chip" data-preset="all-time">All time</button>
         </div>
 
-        {{-- Right: date range + actions --}}
-        <form id="flt" class="lg:justify-self-end flex flex-wrap items-end justify-start gap-3">
+        {{-- Date range + actions (RIGHT) --}}
+        <form id="flt" class="ml-auto flex flex-wrap items-end gap-3">
           <div>
             <label class="block text-[11px] uppercase tracking-wide text-slate-500">From</label>
             <input type="date" name="from" value="{{ $from }}"
-                   class="mt-1 h-9 rounded-xl border-slate-200 text-sm focus:ring-0 focus:border-slate-400">
+                   class="mt-1 rounded-xl border-slate-200 text-sm focus:ring-0 focus:border-slate-400">
           </div>
-
           <div>
             <label class="block text-[11px] uppercase tracking-wide text-slate-500">To</label>
             <input type="date" name="to" value="{{ $to }}"
-                   class="mt-1 h-9 rounded-xl border-slate-200 text-sm focus:ring-0 focus:border-slate-400">
+                   class="mt-1 rounded-xl border-slate-200 text-sm focus:ring-0 focus:border-slate-400">
           </div>
 
           <div class="flex flex-col gap-2">
             {{-- Unpaid-only toggle --}}
             <label class="inline-flex items-center gap-2 text-[11px] text-slate-600">
-              <input type="checkbox" name="unpaid" value="1" {{ $qUnpaid ? 'checked' : '' }}
+              <input type="checkbox" name="unpaid"
                      class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 focus:ring-offset-0">
               <span>Show only unpaid invoices</span>
             </label>
@@ -146,37 +100,53 @@
       <div class="{{ $card }}">
         <div class="flex items-center justify-between">
           <span class="{{ $label }}">Opening</span>
-          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-700 text-xs">Op</span>
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-700 text-xs">
+            Op
+          </span>
         </div>
         <div id="t_open" class="{{ $val }} text-slate-900">—</div>
-        <p class="text-[11px] text-slate-500">Balance before selected period.</p>
+        <p class="text-[11px] text-slate-500">
+          Balance before selected period.
+        </p>
       </div>
 
       <div class="{{ $card }}">
         <div class="flex items-center justify-between">
           <span class="{{ $label }}">Charges (Invoices)</span>
-          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-50 text-rose-600 text-xs">+</span>
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-50 text-rose-600 text-xs">
+            +
+          </span>
         </div>
         <div id="t_chg" class="{{ $val }} text-rose-700">—</div>
-        <p class="text-[11px] text-slate-500">Total invoices in range.</p>
+        <p class="text-[11px] text-slate-500">
+          Total invoices in range.
+        </p>
       </div>
 
       <div class="{{ $card }}">
         <div class="flex items-center justify-between">
           <span class="{{ $label }}">Credits (Payments)</span>
-          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 text-xs">−</span>
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 text-xs">
+            −
+          </span>
         </div>
         <div id="t_cr" class="{{ $val }} text-emerald-700">—</div>
-        <p class="text-[11px] text-slate-500">Total payments & credits in range.</p>
+        <p class="text-[11px] text-slate-500">
+          Total payments & credits in range.
+        </p>
       </div>
 
       <div class="{{ $card }}">
         <div class="flex items-center justify-between">
           <span class="{{ $label }}">Closing Balance</span>
-          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 text-xs">=</span>
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 text-xs">
+            =
+          </span>
         </div>
         <div id="t_close" class="{{ $val }} text-indigo-700">—</div>
-        <p class="text-[11px] text-slate-500">Opening + Charges − Credits.</p>
+        <p class="text-[11px] text-slate-500">
+          Opening + Charges − Credits.
+        </p>
       </div>
     </div>
 
@@ -215,29 +185,25 @@
 
 @push('styles')
 <style>
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-  .chip{
-    border-radius:9999px;
-    border:1px solid rgb(226 232 240);
-    background:#fff;
-    padding:5px 10px; /* compact */
-    font-size:0.72rem; /* compact */
-    line-height:1rem;
-    color:rgb(71 85 105);
-    transition:background .15s ease, box-shadow .15s ease, border-color .15s ease;
+  .chip {
+    border-radius: 9999px;
+    border: 1px solid rgb(226 232 240);
+    background: white;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    color: rgb(71 85 105);
+    transition: background .15s ease, box-shadow .15s ease, border-color .15s ease;
   }
-  .chip:hover{
-    background:rgb(248 250 252);
-    box-shadow:0 1px 4px rgba(148, 163, 184, 0.28);
-    border-color:rgb(203 213 225);
+  .chip:hover {
+    background: rgb(248 250 252);
+    box-shadow: 0 1px 4px rgba(148, 163, 184, 0.35);
+    border-color: rgb(203 213 225);
   }
-  .chip.is-active{
-    background:rgb(15 23 42);
-    color:#fff;
-    border-color:rgb(15 23 42);
-    box-shadow:0 6px 18px rgba(15,23,42,0.14);
+  .chip.is-active {
+    background: rgb(15 23 42);
+    color: #fff;
+    border-color: rgb(15 23 42);
+    box-shadow: 0 6px 18px rgba(15,23,42,0.14);
   }
 </style>
 @endpush
@@ -261,32 +227,31 @@
   const btnApply = $('#btnApply');
   const btnReset = $('#btnReset');
 
-  // Preset chips
   const chips = $$('.chip[data-preset]');
   const pad = n => n.toString().padStart(2,'0');
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const lastOfMonth = (d)=>new Date(d.getFullYear(), d.getMonth()+1, 0);
+  const lastOfMonth  = (d)=>new Date(d.getFullYear(), d.getMonth()+1, 0);
 
-  function setPreset(preset){
+  function setPreset(p){
     const now = new Date();
 
-    if(preset === 'this-month'){
+    if(p === 'this-month'){
       const d = new Date(now.getFullYear(), now.getMonth(), 1);
       fromEl.value = ymd(d);
       toEl.value   = ymd(now);
-    } else if(preset === 'this-year'){
+    } else if(p === 'this-year'){
       const y = now.getFullYear();
       fromEl.value = `${y}-01-01`;
       toEl.value   = ymd(now);
-    } else if(preset === 'last-month'){
+    } else if(p === 'last-month'){
       const lm = new Date(now.getFullYear(), now.getMonth()-1, 1);
       fromEl.value = ymd(lm);
       toEl.value   = ymd(lastOfMonth(lm));
-    } else if(preset === 'last-year'){
+    } else if(p === 'last-year'){
       const y = now.getFullYear() - 1;
       fromEl.value = `${y}-01-01`;
       toEl.value   = `${y}-12-31`;
-    } else if(preset === 'all-time'){
+    } else if(p === 'all-time'){
       fromEl.value = `1900-01-01`;
       toEl.value   = ymd(now);
     }
@@ -322,7 +287,7 @@
         (p==='this-year'  && match(thisYearFrom,  thisYearTo))  ||
         (p==='last-month' && match(lastMonthFrom, lastMonthTo)) ||
         (p==='last-year'  && match(lastYearFrom,  lastYearTo))  ||
-        (p==='all-time'   && match(allFrom,       allTo))
+        (p==='all-time'   && match(allFrom, allTo))
       ) c.classList.add('is-active');
     });
   }
@@ -335,7 +300,6 @@
     });
   });
 
-  // Reset to initial server defaults
   btnReset.addEventListener('click', ()=>{
     fromEl.value = initialFrom;
     toEl.value   = initialTo;
@@ -344,7 +308,6 @@
     load();
   });
 
-  // KPIs + meta
   const tOpen  = $('#t_open');
   const tChg   = $('#t_chg');
   const tCr    = $('#t_cr');
@@ -352,7 +315,6 @@
   const meta   = $('#metaRange');
   const body   = $('#ledgerBody');
 
-  // Export buttons
   const btnCsv   = $('#btnExportCsv');
   const btnPrint = $('#btnPrint');
 
@@ -367,16 +329,13 @@
   }
 
   btnCsv?.addEventListener('click', ()=>{
-    const qs = buildQs({format:'csv'});
-    window.location = `${routeExport}?${qs}`;
+    window.location = `${routeExport}?${buildQs({format:'csv'})}`;
   });
 
   btnPrint?.addEventListener('click', ()=>{
-    const qs = buildQs({format:'print'});
-    window.open(`${routeExport}?${qs}`, '_blank');
+    window.open(`${routeExport}?${buildQs({format:'print'})}`, '_blank');
   });
 
-  // Apply
   btnApply?.addEventListener('click', (e)=>{
     e.preventDefault();
     syncActiveChip();
@@ -386,8 +345,7 @@
   async function load(){
     body.innerHTML = `<tr><td colspan="7" class="px-3 py-6 text-center text-slate-500">Loading…</td></tr>`;
     try{
-      const qs  = buildQs();
-      const res = await fetch(`${routeData}?${qs}`, {headers:{'Accept':'application/json'}});
+      const res = await fetch(`${routeData}?${buildQs()}`, {headers:{'Accept':'application/json'}});
       const data = await res.json();
 
       const opening = +data.opening || 0;
@@ -400,8 +358,7 @@
       tCr.textContent    = fmt2.format(credits);
       tClose.textContent = fmt2.format(closing);
 
-      const unpaid = data.unpaid ? true : false;
-      meta.textContent   = `${data.from} → ${data.to}` + (unpaid ? ' • unpaid invoices only' : '');
+      meta.textContent = `${data.from} → ${data.to}` + (data.unpaid ? ' • unpaid invoices only' : '');
 
       const rows = Array.isArray(data.rows) ? data.rows : [];
       if(!rows.length){
@@ -415,15 +372,9 @@
           <td class="px-3 py-2 text-slate-700 whitespace-nowrap">${r.type ?? ''}</td>
           <td class="px-3 py-2 font-mono text-xs text-slate-700 whitespace-nowrap">${r.doc_no ?? ''}</td>
           <td class="px-3 py-2 text-slate-600">${r.description ?? ''}</td>
-          <td class="px-3 py-2 text-right ${(+r.debit||0)?'text-rose-700 font-medium':''}">
-            ${fmt2.format(+r.debit||0)}
-          </td>
-          <td class="px-3 py-2 text-right ${(+r.credit||0)?'text-emerald-700 font-medium':''}">
-            ${fmt2.format(+r.credit||0)}
-          </td>
-          <td class="px-3 py-2 text-right font-semibold text-indigo-700">
-            ${fmt2.format(+r.balance||0)}
-          </td>
+          <td class="px-3 py-2 text-right ${(+r.debit||0)?'text-rose-700 font-medium':''}">${fmt2.format(+r.debit||0)}</td>
+          <td class="px-3 py-2 text-right ${(+r.credit||0)?'text-emerald-700 font-medium':''}">${fmt2.format(+r.credit||0)}</td>
+          <td class="px-3 py-2 text-right font-semibold text-indigo-700">${fmt2.format(+r.balance||0)}</td>
         </tr>
       `).join('');
     }catch(e){

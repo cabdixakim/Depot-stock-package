@@ -4,7 +4,7 @@
 
 @section('content')
 @php
-  // Brand config with safe fallbacks (no more "Laravel")
+  // Brand with safe fallbacks (no "Laravel" unless that's literally app.name)
   $brandName =
       config('depot-stock.brand.name')
       ?? config('depot-stock.company_name')
@@ -17,52 +17,29 @@
       ?? null;
 
   $logoUrl = null;
-
   if ($logoCfg) {
-      if (preg_match('/^https?:\/\//i', $logoCfg)) {
-          $logoUrl = $logoCfg;
-      } else {
-          $path = public_path(ltrim($logoCfg, '/'));
-          if (is_file($path)) $logoUrl = asset(ltrim($logoCfg, '/'));
-      }
+    if (preg_match('/^https?:\/\//i', $logoCfg)) {
+      $logoUrl = $logoCfg;
+    } else {
+      $path = public_path(ltrim($logoCfg, '/'));
+      if (is_file($path)) $logoUrl = asset(ltrim($logoCfg, '/'));
+    }
   }
 @endphp
 
 <style>
-  /* Hide global chrome */
+  /* ——— Hide any global chrome on this page ——— */
   .sticky.top-0, header, nav, #sideDrawer, #drawerBackdrop { display:none !important; }
 
   body { background:#fff; }
   .wrap { max-width:900px; margin:32px auto; padding:0 20px; font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#111; }
-
-  .top { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; }
-
-  .brand {
-    display:flex; align-items:center; gap:12px;
-    margin-bottom:10px;
-  }
-  .brand img {
-    height:38px; width:auto; border-radius:12px;
-    border:1px solid #eef2f7;
-    box-shadow:0 2px 10px rgba(2,6,23,.06);
-    background:#fff;
-    padding:6px;
-  }
-  .brand-fallback {
-    display:inline-flex; align-items:center; gap:10px;
-    padding:10px 12px;
-    border-radius:14px;
-    background: linear-gradient(135deg, rgba(15,23,42,1), rgba(51,65,85,1));
-    color:#fff;
-    font-weight:800;
-    letter-spacing:.08em;
-    text-transform:uppercase;
-    box-shadow:0 10px 28px rgba(2,6,23,.14);
-  }
-  .brand-fallback svg { width:18px; height:18px; opacity:.95; }
-
   h1 { margin:0 0 6px; font-size:18px; }
   .muted { color:#666; font-size:12px; }
+
+  table { width:100%; border-collapse:collapse; margin-top:16px; }
+  th, td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
+  th { text-align:left; color:#555; font-weight:600; }
+  td.r { text-align:right; }
 
   .totals { display:flex; flex-wrap:wrap; gap:16px; margin-top:12px; }
   .card {
@@ -76,17 +53,56 @@
   }
   .big { font-weight:600; font-size:16px; }
 
-  table { width:100%; border-collapse:collapse; margin-top:16px; }
-  th, td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
-  th { text-align:left; color:#555; font-weight:600; }
-  td.r { text-align:right; }
+  /* Brand block */
+  .brand {
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    border-radius:14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7f7fb 100%);
+    border: 1px solid #eee;
+    box-shadow: 0 10px 28px rgba(2,6,23,.08);
+    margin-bottom: 10px;
+  }
+  .brand img {
+    height:34px;
+    width:auto;
+    border-radius:10px;
+    background:#fff;
+    border:1px solid #eef2f7;
+    padding:6px;
+  }
+  .brand-mark {
+    width:34px; height:34px;
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg, #0f172a, #334155);
+    color:#fff;
+    box-shadow: 0 10px 22px rgba(2,6,23,.14);
+  }
+  .brand-word {
+    font-weight:800;
+    letter-spacing:.08em;
+    font-size:12px;
+    text-transform:uppercase;
+    color:#0f172a;
+    line-height:1.1;
+  }
+  .brand-sub {
+    font-size:11px;
+    color:#64748b;
+    margin-top:2px;
+    letter-spacing:.02em;
+    text-transform:none;
+  }
 
-  /* Buttons */
+  /* Pretty buttons */
   #printBtn {
     display:inline-flex; align-items:center; gap:8px;
     font-size:13px; color:#fff; text-decoration:none; font-weight:600;
     background:linear-gradient(135deg,#6366f1,#4f46e5);
-    padding:8px 14px; border-radius:10px;
+    padding:8px 14px; border-radius:8px;
     box-shadow:0 2px 6px rgba(79,70,229,.2);
     transition:all .2s ease;
     margin-left:8px;
@@ -98,7 +114,7 @@
     display:inline-flex; align-items:center; gap:8px;
     font-size:13px; color:#374151; text-decoration:none; font-weight:600;
     background:#f3f4f6;
-    padding:8px 14px; border-radius:10px;
+    padding:8px 14px; border-radius:8px;
     border:1px solid #e5e7eb;
     transition:all .2s ease;
   }
@@ -111,20 +127,25 @@
 </style>
 
 <div class="wrap">
-  <div class="top">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;">
     <div>
+      {{-- ✅ Beautiful brand/logo (PRINT ONLY) --}}
       <div class="brand">
         @if($logoUrl)
           <img src="{{ $logoUrl }}" alt="{{ $brandName }}">
         @else
-          <div class="brand-fallback">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <div class="brand-mark">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 4v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V7l8-4z"/>
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"/>
             </svg>
-            <span>{{ $brandName }}</span>
           </div>
         @endif
+
+        <div>
+          <div class="brand-word">{{ $brandName }}</div>
+          <div class="brand-sub">Client statement</div>
+        </div>
       </div>
 
       <h1>Statement</h1>
