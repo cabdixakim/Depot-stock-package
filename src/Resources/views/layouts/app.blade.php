@@ -68,33 +68,74 @@
           </svg>
         </button>
 
-      {{-- Brand: centred on mobile, normal on md+ --}}
-      @if($isPureOps)
-        <span class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
-          </svg>
-          Depot Stock
-        </span>
+{{-- Brand: centred on mobile, normal on md+ --}}
+@php
+  $brandName = config('depot-stock.brand.name')
+    ?? config('app.name')
+    ?? 'Depot Stock';
 
-      @elseif($isPureCompliance)
-        <a href="{{ route('depot.compliance.clearances.index') }}"
-          class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
-          </svg>
-          Depot Stock
-        </a>
+  // keep the same routing behaviour you already had
+  $brandTag  = $isPureOps ? 'span' : 'a';
+  $brandHref = $isPureCompliance
+    ? route('depot.compliance.clearances.index')
+    : route('depot.dashboard');
+@endphp
 
-      @else
-        <a href="{{ route('depot.dashboard') }}"
-          class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 11h4v10H3zM9 3h4v18H9zM15 7h4v14h-4z"/>
-          </svg>
-          Depot Stock
-        </a>
-      @endif
+<{{ $brandTag }}
+  @if($brandTag === 'a') href="{{ $brandHref }}" @endif
+  class="inline-flex items-center gap-2 font-semibold text-gray-900 flex-1 justify-center md:flex-none md:justify-start select-none"
+>
+  {{-- Small mark (keeps your icon feel but more premium) --}}
+  <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gray-900 text-white shadow-sm ring-1 ring-black/10">
+    <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
+      <path d="M12 2.75c3.8 3 7.6 3.5 9 3.75v7.35c0 5.4-3.95 9-9 9.8-5.05-.8-9-4.4-9-9.8V6.5c1.4-.25 5.2-.75 9-3.75Z"
+            stroke="rgba(255,255,255,.92)" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M8.6 12.1l2.2 2.2 4.8-5"
+            stroke="rgba(110,231,183,.98)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+
+  {{-- Wordmark (modern, subtle gradient, no external font) --}}
+  <span class="leading-none">
+    <svg viewBox="0 0 920 90" class="h-6 w-auto" role="img" aria-label="{{ $brandName }}">
+      <defs>
+        <linearGradient id="brandGradTopbar" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#0f172a"/>
+          <stop offset="0.55" stop-color="#111827"/>
+          <stop offset="1" stop-color="#1f2937"/>
+        </linearGradient>
+
+        <filter id="brandSoftTopbar" x="-20%" y="-60%" width="140%" height="220%">
+          <feGaussianBlur stdDeviation="1.6" result="b"/>
+          <feColorMatrix in="b" type="matrix"
+            values="1 0 0 0 0
+                    0 1 0 0 0
+                    0 0 1 0 0
+                    0 0 0 .18 0" result="g"/>
+          <feMerge>
+            <feMergeNode in="g"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <text x="0" y="62"
+            fill="url(#brandGradTopbar)"
+            filter="url(#brandSoftTopbar)"
+            font-size="54"
+            font-weight="900"
+            letter-spacing="5"
+            font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial">
+        {{ $brandName }}
+      </text>
+    </svg>
+
+    {{-- tiny subtitle (optional but makes it feel “logo-like”) --}}
+    <span class="block text-[10px] uppercase tracking-[0.28em] text-gray-400 -mt-0.5">
+      operations suite
+    </span>
+  </span>
+</{{ $brandTag }}>
 
   <nav class="hidden md:flex items-center gap-1 min-w-0 flex-1 justify-start">
     <div class="navwrap">
