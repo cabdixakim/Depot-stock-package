@@ -432,26 +432,32 @@
                             Opening @20°
                         </p>
                         <div class="mt-2 flex items-center gap-2">
+                            @php
+                                // Show opening balance, previous closing, and variance if available
+                                $openingBalance = $currentDay?->opening_l_20 ?? null;
+                                $prevClosing = $movementCurrent['opening_balance_prev_closing_l_20'] ?? null;
+                                $varianceFlag = $movementCurrent['opening_variance_flag'] ?? false;
+                            @endphp
                             <span class="text-xl font-semibold text-gray-900">
-                                {{ $formatLitres($currentDay?->opening_l_20) }}
+                                {{ $formatLitres($openingBalance) }}
                             </span>
-                            @if(isset($movementCurrent['opening_variance_flag']) && $movementCurrent['opening_variance_flag'])
+                            @if($varianceFlag)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold ml-2" title="Opening differs from previous day's closing">
                                     <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     Opening variance
                                 </span>
                             @endif
                         </div>
-                        @if(isset($movementCurrent['opening_balance_prev_closing_l_20']))
+                        @if($prevClosing !== null)
                             <p class="mt-1 text-xs text-gray-500">
                                 <span class="font-medium">Prev closing:</span>
-                                {{ number_format($movementCurrent['opening_balance_prev_closing_l_20'], 0) }} L
+                                {{ number_format($prevClosing, 0) }} L
                             </p>
                         @endif
-                        @if(isset($movementCurrent['opening_variance_flag']) && $movementCurrent['opening_variance_flag'] && isset($movementCurrent['opening_balance_l_20']) && isset($movementCurrent['opening_balance_prev_closing_l_20']))
+                        @if($varianceFlag && $openingBalance !== null && $prevClosing !== null)
                             <p class="mt-1 text-xs text-rose-600">
                                 <span class="font-medium">Variance:</span>
-                                {{ number_format($movementCurrent['opening_balance_l_20'] - $movementCurrent['opening_balance_prev_closing_l_20'], 0) }} L
+                                {{ number_format($openingBalance - $prevClosing, 0) }} L
                             </p>
                         @endif
                     </div>
