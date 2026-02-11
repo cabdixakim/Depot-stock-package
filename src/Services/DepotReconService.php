@@ -226,10 +226,10 @@ class DepotReconService
             ->whereDate('date', $d)
             ->sum('amount_20_l');
 
-        // Correct logic: adjustments should be added to net, not folded into in/out
-        $in  = $loadsIn;
-        $out = $offloadsOut;
-        $net = $loadsIn - $offloadsOut + $adj;
+        // Correct logic: offloads = IN, loads = OUT
+        $in  = $offloadsOut;
+        $out = $loadsIn;
+        $net = $offloadsOut - $loadsIn + $adj;
 
         return [
             'in_l_20'  => round($in, 4),
