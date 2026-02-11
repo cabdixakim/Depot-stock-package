@@ -159,6 +159,39 @@ class DepotReconService
     }
 
     /**
+     * Get expected opening for a day: yesterday's closing dip, fallback to null.
+     */
+    public function getExpectedOpening(Tank $tank, Carbon $date): ?float
+    {
+        $prevDate = $date->copy()->subDay();
+        $prevDay = DepotReconDay::where('tank_id', $tank->id)
+            ->whereDate('date', $prevDate->toDateString())
+            ->first();
+        if ($prevDay && $prevDay->closing_actual_l_20 !== null) {
+            return (float) $prevDay->closing_actual_l_20;
+        }
+        return null;
+    }
+
+    /**
+     * Flag opening variance for a day: actual opening vs expected opening.
+     * Adds opening_variance_l_20 and opening_variance_flag fields (if present).
+     */
+    public function flagOpeningVariance(DepotReconDay $day, Tank $tank, Carbon $date): void
+    {
+        $expectedOpening = $this->getExpectedOpening($tank, $date);
+        if ($expectedOpening === null || $day->opening_l_20 === null) {
+            $day->opening_variance_l_20 = null;
+            $day->opening_variance_flag = false;
+            return;
+        }
+        $var = $day->opening_l_20 - $expectedOpening;
+        $day->opening_variance_l_20 = $var;
+        // Flag if variance is nonzero (or set a tolerance if needed)
+        $day->opening_variance_flag = abs($var) > 0.0;
+    }
+
+    /**
      * Get movement totals for one tank and one day.
      *
      * Returns:
@@ -197,6 +230,10 @@ class DepotReconService
         return [
             'in_l_20'  => round($in, 4),
             'out_l_20' => round($out, 4),
+            'adj_l_20' => round($adj, 4),
+            'loads_l'  => round($loadsIn, 4),
+            'offloads_l' => round($offloadsOut, 4),
+            'net_l'    => round($in - $out, 4),
         ];
     }
 }

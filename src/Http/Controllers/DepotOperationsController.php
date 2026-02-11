@@ -38,7 +38,7 @@ class DepotOperationsController extends Controller
             ->count();
 
         // 2) Variance alerts (above tolerance)
-        $varianceTolerancePct = 0.3; // you can move this to config later
+        $varianceTolerancePct = config('depot-stock.closing_variance_tolerance_pct', 0.003); // now from config, default 0.3%
         $varianceAlertsToday = $todayDays
             ->filter(function (DepotReconDay $day) use ($varianceTolerancePct) {
                 if (is_null($day->variance_pct)) {

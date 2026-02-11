@@ -69,10 +69,10 @@ class DipController extends Controller
 
         // Book balance @20°
         if ($tankId) {
-            // per-tank book
-            $bookBalance20 = $this->bookBalanceForTank($tankId);
+            // per-tank book + depot pool
+            $bookBalance20 = $this->bookBalanceForTankWithDepotPool($tankId);
         } else {
-            // global across all tanks
+            // global across all tanks (legacy, does not include depot pool for all tanks)
             $bookBalance20 = $this->bookBalanceForAllTanks();
         }
 
@@ -400,5 +400,12 @@ class DipController extends Controller
             ->sum('amount_20_l');
 
         return ($off + $adjPos) - ($loads + $adjNeg);
+    }
+
+    private function bookBalanceForTankWithDepotPool(int $tankId, $date = null): float
+    {
+        $book = $this->bookBalanceForTank($tankId);
+        $pool = \Optima\DepotStock\Models\Tank::poolBalanceForTank($tankId, $date);
+        return $book + $pool;
     }
 }

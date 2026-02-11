@@ -49,6 +49,7 @@
 
     $movOff  = $movementCurrent['offloads_l'] ?? null;
     $movLoad = $movementCurrent['loads_l']    ?? null;
+    $movAdj  = $movementCurrent['adj_l_20']   ?? null;
     $movNet  = $movementCurrent['net_l']      ?? null;
 
     // Pre-generate URLs for JS
@@ -487,18 +488,21 @@
                                 @endif
                             </p>
                         </div>
-
                         <div class="rounded-xl bg-gray-50/80 px-4 py-3">
                             <p class="text-[11px] uppercase text-gray-500 font-semibold">Loads</p>
                             <p class="mt-2 text-lg font-semibold text-gray-900">
                                 @if($movLoad !== null)
                                     {{ number_format($movLoad, 0) }} L
+                                    @if($movAdj !== null && $movAdj != 0)
+                                        <span class="block text-xs mt-1 text-gray-500">
+                                            <span class="font-medium">Adj:</span> <span class="{{ $movAdj > 0 ? 'text-emerald-600' : 'text-rose-600' }}">{{ $movAdj > 0 ? '+' : '' }}{{ number_format($movAdj, 0) }} L</span>
+                                        </span>
+                                    @endif
                                 @else
                                     —
                                 @endif
                             </p>
                         </div>
-
                         <div class="rounded-xl bg-gray-50/80 px-4 py-3">
                             <p class="text-[11px] uppercase text-gray-500 font-semibold">Net</p>
                             <p class="mt-2 text-lg font-semibold {{ $movNet >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">

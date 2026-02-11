@@ -22,6 +22,8 @@ class DepotReconDay extends Model
         'note',
         'created_by_user_id',
         'checked_by_user_id',
+        'opening_variance_l_20',
+        'opening_variance_flag',
     ];
 
     protected $casts = [
@@ -31,6 +33,8 @@ class DepotReconDay extends Model
         'closing_actual_l_20'  => 'float',
         'variance_l_20'        => 'float',
         'variance_pct'         => 'float',
+        'opening_variance_l_20'=> 'float',
+        'opening_variance_flag'=> 'boolean',
     ];
 
     public function tank(): BelongsTo

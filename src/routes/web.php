@@ -33,6 +33,9 @@ use Optima\DepotStock\Http\Controllers\DepotOperationsController;
 use Optima\DepotStock\Http\Controllers\DepotReconController;
 use Optima\DepotStock\Http\Controllers\OperationsClientController;
 
+// ✅ NEW: Audit controller
+use Optima\DepotStock\Http\Controllers\AuditController;
+
 // =========================================================
 // STAFF AREA (/depot/...)
 // =========================================================
@@ -153,6 +156,10 @@ Route::middleware(['web', 'auth'])
             // Operations client list (lean)
             Route::get('/clients', [OperationsClientController::class, 'index'])
                 ->name('clients.index');
+
+            // Audit view (flagged variances)
+            Route::get('/audit', [AuditController::class, 'index'])
+                ->name('depot.operations.audit');
         });
 
         // ---------------- Dips (Daily tank dips per depot) ----------------

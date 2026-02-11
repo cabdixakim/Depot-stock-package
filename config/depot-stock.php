@@ -7,4 +7,5 @@ return [
     'default_timezone' => 'Africa/Lubumbashi',
     // Temperature correction mode: 'simple' (approximation) or 'table' (future hook)
     'vcf_mode' => 'simple',
+    'closing_variance_tolerance_pct' => 0.003, // 0.3% tolerance for closing variance
 ];

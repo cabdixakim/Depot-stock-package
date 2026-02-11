@@ -19,7 +19,13 @@
     "laravel": {
       "providers": ["Optima\\DepotStock\\DepotStockServiceProvider"]
     }
+  },
+  "require-dev": {
+    "orchestra/testbench": "^10.9"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Optima\\DepotStock\\Tests\\": "tests/"
+    }
   }
 }
-
-
