@@ -54,8 +54,11 @@ if (confirmBtn) {
             confirmBtn.textContent = 'Confirm';
             if (data.ok) {
                 closeDepotPoolAdjustModal();
-                alert('Depot pool adjusted for variance.');
-                window.location.reload();
+                // Replace adjust block with indication
+                const block = document.getElementById('varianceAdjustBlock');
+                if (block) {
+                    block.innerHTML = `<span class='text-xs text-gray-700'>Depot pool adjusted for variance on ${depotPoolAdjustData.date} (Tank ${depotPoolAdjustData.tank_id})</span><span class='text-xs font-semibold ${depotPoolAdjustData.variance_l_20 > 0 ? 'text-emerald-600' : 'text-rose-600'}'>Variance: ${depotPoolAdjustData.variance_l_20 > 0 ? '+' : ''}${depotPoolAdjustData.variance_l_20} L</span><span class='text-xs text-gray-500'>by You</span>`;
+                }
             } else {
                 alert(data.message || 'Adjustment failed.');
             }
