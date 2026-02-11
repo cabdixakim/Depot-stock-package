@@ -159,14 +159,14 @@ Route::middleware(['web', 'auth'])
 
             // Audit view (flagged variances)
             Route::get('/audit', [AuditController::class, 'index'])
-                ->name('depot.operations.audit');
+                ->name('operations.audit');
 
             // Audit view (all-inclusive)
             Route::get('/operations/audit', [AuditController::class, 'index'])
                 ->name('audit');
             // Audit CSV export
             Route::get('/operations/audit/export', [AuditController::class, 'export'])
-                ->name('depot.audit.export');
+                ->name('audit.export');
         });
 
         // ---------------- Dips (Daily tank dips per depot) ----------------
