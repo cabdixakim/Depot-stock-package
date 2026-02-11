@@ -58,32 +58,10 @@ class DepotReconController extends Controller
 
                 try {
                     $tankIds = $tanks->pluck('id');
-
-                    $offloadsByTank = \Optima\DepotStock\Models\Offload::query()
-                        ->whereIn('tank_id', $tankIds)
-                        ->whereDate('date', $date->toDateString())     // ⬅️ adjust date column if needed
-                        ->get(['tank_id', 'delivered_20_l'])           // ⬅️ adjust volume column if needed
-                        ->groupBy('tank_id')
-                        ->map(fn ($rows) => (float) $rows->sum('delivered_20_l'));
-
-                    $loadsByTank = \Optima\DepotStock\Models\Load::query()
-                        ->whereIn('tank_id', $tankIds)
-                        ->whereDate('date', $date->toDateString())     // ⬅️ adjust date column if needed
-                        ->get(['tank_id', 'loaded_20_l'])              // ⬅️ adjust volume column if needed
-                        ->groupBy('tank_id')
-                        ->map(fn ($rows) => (float) $rows->sum('loaded_20_l'));
-
-                    $movementByTank = $tankIds->mapWithKeys(function ($tankId) use ($offloadsByTank, $loadsByTank) {
-                        $off  = $offloadsByTank[$tankId] ?? 0.0;
-                        $load = $loadsByTank[$tankId]   ?? 0.0;
-
-                        return [
-                            $tankId => [
-                                'offloads_l' => $off,
-                                'loads_l'    => $load,
-                                'net_l'      => $off - $load,
-                            ],
-                        ];
+                    $movementByTank = $tankIds->mapWithKeys(function ($tankId) use ($date) {
+                        // Use DepotReconService to get full movement summary including adjustments
+                        $totals = $this->recon->movementTotalsForDay($tankId, $date);
+                        return [$tankId => $totals];
                     });
                 } catch (\Throwable $e) {
                     $movementByTank = collect(); // fail-safe, UI will just show "—"
