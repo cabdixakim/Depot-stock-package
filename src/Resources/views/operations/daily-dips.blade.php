@@ -1,6 +1,8 @@
 {{-- resources/views/vendor/depot-stock/operations/daily-dips.blade.php --}}
 @extends('depot-stock::operations.layout')
 
+@include('depot-stock::operations.partials.depot-pool-adjust-modal')
+
 @section('ops-content')
 @php
     use Illuminate\Support\Carbon;
@@ -76,6 +78,16 @@
 
     // PATCH: lock flag for disabling actions
     $isLocked = (bool) ($currentDay && $currentDay->status === 'locked');
+
+    // --- VARIANCE ADJUSTMENT BUTTON LOGIC ---
+    $showVarianceAdjustBtn = false;
+    $varianceTolerance = 50; // litres, adjust as needed
+    $maxDaysOld = 5;
+    if ($currentDay && $currentDay->status === 'locked' && isset($currentDay->variance_l_20)) {
+        $absVariance = abs($currentDay->variance_l_20);
+        $daysOld = \Illuminate\Support\Carbon::parse($forDate)->diffInDays(\Illuminate\Support\Carbon::today());
+        $showVarianceAdjustBtn = $absVariance > $varianceTolerance && $daysOld <= $maxDaysOld && $currentDay->variance_l_20 != 0;
+    }
 @endphp
 
 <div class="space-y-6">
@@ -351,6 +363,20 @@
                         </div>
                     </div>
                 </div>
+
+                @if($showVarianceAdjustBtn)
+                    <div class="my-4 flex items-center gap-2">
+                        <span class="text-xs text-gray-700">Locked day for {{ $forDate->toDateString() }} (Tank {{ $currentTank->id }})</span>
+                        <span class="text-xs font-semibold {{ $currentDay->variance_l_20 > 0 ? 'text-emerald-600' : 'text-rose-600' }}">Variance: {{ $currentDay->variance_l_20 > 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L</span>
+                        <button type="button" class="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" onclick="openDepotPoolAdjustModal({{ $currentDay->variance_l_20 }}, {
+                            depot_id: {{ $currentTank->depot_id }},
+                            tank_id: {{ $currentTank->id }},
+                            product_id: {{ $currentTank->product_id }},
+                            date: '{{ $forDate->toDateString() }}',
+                            variance_l_20: {{ $currentDay->variance_l_20 }}
+                        })">Adjust Depot Pool</button>
+                    </div>
+                @endif
 
                 {{-- OPENING / CLOSING WIZARD CARDS --}}
                 <div class="grid gap-4 md:grid-cols-2">

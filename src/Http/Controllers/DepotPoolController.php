@@ -231,51 +231,101 @@ class DepotPoolController extends Controller
     }
 
     /** POST /depot/pool/sell */
- public function sell(Request $r)
-{
-    $data = $r->validate([
-        'date'        => 'required|date',
-        'volume_20_l' => 'required|numeric|min:0.001',
-        'product_id'  => 'required|integer|exists:products,id',
-        'depot_id'    => 'required|integer|exists:depots,id',
-        'unit_price'  => 'nullable|numeric|min:0',
-        'reference'   => 'nullable|string|max:255',
-    ]);
+    public function sell(Request $r)
+    {
+        $data = $r->validate([
+            'date'        => 'required|date',
+            'volume_20_l' => 'required|numeric|min:0.001',
+            'product_id'  => 'required|integer|exists:products,id',
+            'depot_id'    => 'required|integer|exists:depots,id',
+            'unit_price'  => 'nullable|numeric|min:0',
+            'reference'   => 'nullable|string|max:255',
+        ]);
 
-    $available = $this->availableFor((int)$data['depot_id'], (int)$data['product_id']);
-    if ($available < (float)$data['volume_20_l']) {
+        $available = $this->availableFor((int)$data['depot_id'], (int)$data['product_id']);
+        if ($available < (float)$data['volume_20_l']) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Insufficient pool stock for this depot & product. Available: '.number_format($available,3).' L',
+            ], 422);
+        }
+
+        // 🔑 Use provided price or default to 1.1
+        $price = isset($data['unit_price']) && $data['unit_price'] !== ''
+            ? (float) $data['unit_price']
+            : 1.1;
+
+        $noteParts = [];
+        if (!empty($data['reference'])) $noteParts[] = $data['reference'];
+        $noteParts[] = 'Unit: '.config('depot-stock.currency','USD').' '.number_format($price,2);
+        $note = implode(' · ', $noteParts);
+
+        DPE::create([
+            'depot_id'     => $data['depot_id'],
+            'product_id'   => $data['product_id'],
+            'date'         => $data['date'],
+            'type'         => 'out',
+            'volume_20_l'  => $data['volume_20_l'],
+            'unit_price'   => $price,          // 👈 store price
+            'ref_type'     => DPE::REF_SELL,
+            'ref_id'       => 0,
+            'note'         => $note,
+            'created_by'   => auth()->id(),
+        ]);
+
         return response()->json([
-            'ok' => false,
-            'message' => 'Insufficient pool stock for this depot & product. Available: '.number_format($available,3).' L',
-        ], 422);
+            'ok' => true,
+            'message' => 'Sell recorded.',
+        ]);
     }
 
-    // 🔑 Use provided price or default to 1.1
-    $price = isset($data['unit_price']) && $data['unit_price'] !== ''
-        ? (float) $data['unit_price']
-        : 1.1;
+    /**
+     * POST /depot/pool/adjust-variance
+     * Create a depot pool entry for a tank-day variance (manual adjustment).
+     * Expects: depot_id, tank_id, product_id, date, variance_l_20 (can be + or -)
+     * Returns JSON (ok, message)
+     */
+    public function adjustVariance(Request $r)
+    {
+        $data = $r->validate([
+            'depot_id'      => 'required|integer|exists:depots,id',
+            'tank_id'       => 'required|integer|exists:tanks,id',
+            'product_id'    => 'required|integer|exists:products,id',
+            'date'          => 'required|date',
+            'variance_l_20' => 'required|numeric|not_in:0',
+        ]);
 
-    $noteParts = [];
-    if (!empty($data['reference'])) $noteParts[] = $data['reference'];
-    $noteParts[] = 'Unit: '.config('depot-stock.currency','USD').' '.number_format($price,2);
-    $note = implode(' · ', $noteParts);
+        // Find tank and check it matches depot/product
+        $tank = Tank::where('id', $data['tank_id'])
+            ->where('depot_id', $data['depot_id'])
+            ->where('product_id', $data['product_id'])
+            ->first();
+        if (!$tank) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Tank not found for depot/product.',
+            ], 422);
+        }
 
-    DPE::create([
-        'depot_id'     => $data['depot_id'],
-        'product_id'   => $data['product_id'],
-        'date'         => $data['date'],
-        'type'         => 'out',
-        'volume_20_l'  => $data['volume_20_l'],
-        'unit_price'   => $price,          // 👈 store price
-        'ref_type'     => DPE::REF_SELL,
-        'ref_id'       => 0,
-        'note'         => $note,
-        'created_by'   => auth()->id(),
-    ]);
+        // Create depot pool entry (type in/out based on sign)
+        $type = $data['variance_l_20'] > 0 ? DPE::TYPE_IN : DPE::TYPE_OUT;
+        $refType = DPE::REF_ALLOWANCE_CORR; // Use correction type for audit
 
-    return response()->json([
-        'ok' => true,
-        'message' => 'Sell recorded.',
-    ]);
-}
+        DPE::create([
+            'depot_id'     => $data['depot_id'],
+            'product_id'   => $data['product_id'],
+            'date'         => $data['date'],
+            'type'         => $type,
+            'volume_20_l'  => abs($data['variance_l_20']),
+            'ref_type'     => $refType,
+            'ref_id'       => $tank->id,
+            'note'         => 'Manual pool adjustment for dip variance',
+            'created_by'   => auth()->id(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Depot pool adjusted for variance.',
+        ]);
+    }
 }

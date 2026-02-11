@@ -175,6 +175,8 @@ Route::middleware(['web', 'auth'])
             Route::get('/pool',           [DepotPoolController::class, 'index'])->name('pool.index');
             Route::post('/pool/transfer', [DepotPoolController::class, 'transfer'])->name('pool.transfer');
             Route::post('/pool/sell',     [DepotPoolController::class, 'sell'])->name('pool.sell');
+            // DEPOT POOL VARIANCE ADJUSTMENT (AJAX, admin+accountant)
+            Route::post('/pool/adjust-variance', [DepotPoolController::class, 'adjustVariance'])->name('pool.adjust-variance');
         });
 
         // =================================================================
