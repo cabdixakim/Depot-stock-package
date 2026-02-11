@@ -146,8 +146,73 @@
         </form>
     </div>
 
+    {{-- AUDIT ENHANCEMENTS START --}}
+    {{-- SUMMARY STATS (modern, mobile-first) --}}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 my-4">
+        <div class="rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
+            <p class="text-xs font-semibold text-gray-500">Total Dips</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900">{{ $rows->count() }}</p>
+        </div>
+        <div class="rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
+            <p class="text-xs font-semibold text-gray-500">With Variance</p>
+            <p class="mt-2 text-2xl font-bold text-rose-600">{{ $rows->where('variance_l_20', '!=', 0)->count() }}</p>
+        </div>
+        <div class="rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
+            <p class="text-xs font-semibold text-gray-500">Missing Dips</p>
+            <p class="mt-2 text-2xl font-bold text-amber-500">{{ $rows->whereNull('closing_actual_l_20')->count() }}</p>
+        </div>
+        <div class="rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
+            <p class="text-xs font-semibold text-gray-500">Locked Days</p>
+            <p class="mt-2 text-2xl font-bold text-emerald-600">{{ $rows->where('status_label', 'locked')->count() }}</p>
+        </div>
+    </div>
+
+    {{-- EXPORT BUTTONS --}}
+    <div class="flex flex-wrap gap-2 justify-end mb-2">
+        <button id="btnDipsCopy" class="rounded-lg bg-gray-200 text-gray-700 px-3 py-1.5 text-xs font-semibold shadow-sm hover:bg-gray-300">Copy</button>
+        <button id="btnDipsCsv" class="rounded-lg bg-gray-200 text-gray-700 px-3 py-1.5 text-xs font-semibold shadow-sm hover:bg-gray-300">CSV</button>
+        <button id="btnDipsXlsx" class="rounded-lg bg-gray-200 text-gray-700 px-3 py-1.5 text-xs font-semibold shadow-sm hover:bg-gray-300">Excel</button>
+        <button id="btnDipsPdf" class="rounded-lg bg-gray-200 text-gray-700 px-3 py-1.5 text-xs font-semibold shadow-sm hover:bg-gray-300">PDF</button>
+    </div>
+
+    {{-- VARIANCE HIGHLIGHTING & EXPLANATION MODALS --}}
+    <div id="explainModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="w-full max-w-md rounded-2xl border border-white/60 bg-white/95 shadow-2xl mx-auto my-16">
+            <div class="border-b border-gray-100 px-5 py-4">
+                <h2 class="text-base font-semibold text-gray-900">Explain Variance</h2>
+                <p class="mt-1 text-xs text-gray-500">Provide an explanation for the variance in this dip record.</p>
+            </div>
+            <form class="px-5 py-4 space-y-4">
+                <textarea class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/60" rows="3" placeholder="Enter explanation..."></textarea>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeExplainModal()" class="px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="auditLogModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="w-full max-w-lg rounded-2xl border border-white/60 bg-white/95 shadow-2xl mx-auto my-16">
+            <div class="border-b border-gray-100 px-5 py-4">
+                <h2 class="text-base font-semibold text-gray-900">Audit Log</h2>
+                <p class="mt-1 text-xs text-gray-500">History of explanations and reviews for this dip record.</p>
+            </div>
+            <div class="px-5 py-4">
+                <ul class="space-y-2 text-xs">
+                    <li><span class="font-semibold text-gray-900">2026-02-11 09:00</span> — <span class="text-gray-700">John Doe</span>: Initial variance flagged.</li>
+                    <li><span class="font-semibold text-gray-900">2026-02-11 10:15</span> — <span class="text-gray-700">Jane Smith</span>: Explained variance: “Delivery delay, awaiting paperwork.”</li>
+                </ul>
+                <div class="flex justify-end mt-4">
+                    <button type="button" onclick="closeAuditLogModal()" class="px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{-- AUDIT ENHANCEMENTS END --}}
+
     {{-- EXPORT + TABLE WRAPPER --}}
-<div class="mx-auto max-w-5xl rounded-2xl border border-gray-100 bg-white/95 shadow-sm">        <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mx-auto max-w-5xl rounded-2xl border border-gray-100 bg-white/95 shadow-sm">
+        <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center gap-2 text-xs text-gray-500">
                 <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-[11px] font-semibold text-white">
                     DH
@@ -352,5 +417,27 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+// --- AUDIT ENHANCEMENTS SCRIPTS ---
+function openExplainModal() {
+    var modal = document.getElementById('explainModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+function closeExplainModal() {
+    var modal = document.getElementById('explainModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+function openAuditLogModal() {
+    var modal = document.getElementById('auditLogModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+function closeAuditLogModal() {
+    var modal = document.getElementById('auditLogModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
 </script>
 @endpush
