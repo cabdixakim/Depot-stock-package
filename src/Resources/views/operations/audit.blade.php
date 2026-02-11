@@ -27,7 +27,9 @@
                 <option value="lock" @if(request('type')=='lock') selected @endif>Lock</option>
                 <option value="variance" @if(request('type')=='variance') selected @endif>Variance</option>
             </select>
+            <input type="text" name="q" value="{{ request('q') }}" placeholder="Search details..." class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800" />
             <button class="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-black">Filter</button>
+            <a href="#" id="exportAuditCsv" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 ml-2">Export CSV</a>
         </form>
     </div>
 
@@ -35,11 +37,11 @@
         <table class="min-w-full text-xs text-left">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-4 py-2 font-semibold text-gray-600">Date/Time</th>
-                    <th class="px-4 py-2 font-semibold text-gray-600">User</th>
-                    <th class="px-4 py-2 font-semibold text-gray-600">Depot</th>
-                    <th class="px-4 py-2 font-semibold text-gray-600">Tank</th>
-                    <th class="px-4 py-2 font-semibold text-gray-600">Operation</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600 cursor-pointer" onclick="sortAudit('date')">Date/Time</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600 cursor-pointer" onclick="sortAudit('user')">User</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600 cursor-pointer" onclick="sortAudit('depot')">Depot</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600 cursor-pointer" onclick="sortAudit('tank')">Tank</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600 cursor-pointer" onclick="sortAudit('type')">Operation</th>
                     <th class="px-4 py-2 font-semibold text-gray-600">Details</th>
                 </tr>
             </thead>
@@ -64,7 +66,22 @@
                                 {{ ucfirst($entry->type) }}
                             </span>
                         </td>
-                        <td class="px-4 py-2 text-gray-700">{!! $entry->details !!}</td>
+                        <td class="px-4 py-2 text-gray-700">
+                          {!! $entry->details !!}
+                          @if($entry->before_value !== null || $entry->after_value !== null)
+                            <div class="mt-1 text-[11px] text-gray-500">
+                              @if($entry->before_value !== null)
+                                <span class="mr-2">Before: <b>{{ $entry->before_value }}</b></span>
+                              @endif
+                              @if($entry->after_value !== null)
+                                <span>After: <b>{{ $entry->after_value }}</b></span>
+                              @endif
+                            </div>
+                          @endif
+                          @if($entry->note)
+                            <div class="mt-1 text-[11px] text-amber-700">Note: {{ $entry->note }}</div>
+                          @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
@@ -73,6 +90,27 @@
                 @endforelse
             </tbody>
         </table>
+        {{-- Pagination --}}
+        <div class="p-4 flex justify-center">
+          {{ $auditEntries->links() }}
+        </div>
     </div>
 </div>
+@push('scripts')
+<script>
+function sortAudit(field) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('sort', field);
+    url.searchParams.set('direction', url.searchParams.get('direction') === 'asc' ? 'desc' : 'asc');
+    window.location = url.toString();
+}
+
+document.getElementById('exportAuditCsv')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    const url = new URL(window.location.href);
+    url.pathname = '{{ route('depot.audit.export') }}';
+    window.open(url.toString(), '_blank');
+});
+</script>
+@endpush
 @endsection

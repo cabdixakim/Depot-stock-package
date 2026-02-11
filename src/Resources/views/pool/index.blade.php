@@ -128,13 +128,19 @@
              transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div class="flex items-center justify-between gap-2">
         <div>
-          <div class="text-[11px] uppercase tracking-wide text-emerald-700">Pool Stock</div>
+          <div class="text-[11px] uppercase tracking-wide text-emerald-700">Current Stock</div>
           <div class="mt-1 text-3xl font-semibold text-gray-900">
             {{ $fmtL($now) }} <span class="text-sm text-gray-500">L</span>
           </div>
+          @if($posDip > 0)
+            <div class="mt-1 text-[11px] text-emerald-700 flex items-center gap-1">
+              <svg class="inline h-3 w-3 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              +{{ $fmtL($posDip) }} L from dips variance
+            </div>
+          @endif
         </div>
         <div class="flex flex-col items-end text-[11px] text-gray-500">
-          <span>All-time</span>
+          <span>Current-Balance</span>
           <span class="mt-0.5 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
             House litres
           </span>
