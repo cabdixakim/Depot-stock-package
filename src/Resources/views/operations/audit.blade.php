@@ -1,60 +1,78 @@
 {{-- resources/views/vendor/depot-stock/operations/audit.blade.php --}}
 @extends('depot-stock::operations.layout')
 
+@section('title', 'Depot Operations Audit')
+
 @section('ops-content')
 <div class="space-y-6">
-    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-            <h1 class="text-lg font-semibold text-gray-900">Audit: Flagged Variances</h1>
-            <p class="mt-0.5 text-xs text-gray-500">Review tanks/days with opening or closing variances.</p>
+            <h1 class="text-lg font-semibold text-gray-900">Audit Trail</h1>
+            <p class="mt-0.5 text-xs text-gray-500">Comprehensive log of all depot operations: dips, adjustments, offloads, loads, locks, and more.</p>
         </div>
+        <form method="GET" class="flex flex-wrap items-center gap-2">
+            <input type="date" name="date" value="{{ request('date', now()->toDateString()) }}" class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800" />
+            <select name="user" class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800">
+                <option value="">All users</option>
+                @foreach($users as $user)
+                    <option value="{{ $user->id }}" @if(request('user') == $user->id) selected @endif>{{ $user->name }}</option>
+                @endforeach
+            </select>
+            <select name="type" class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800">
+                <option value="">All types</option>
+                <option value="dip" @if(request('type')=='dip') selected @endif>Dip</option>
+                <option value="adjustment" @if(request('type')=='adjustment') selected @endif>Adjustment</option>
+                <option value="offload" @if(request('type')=='offload') selected @endif>Offload</option>
+                <option value="load" @if(request('type')=='load') selected @endif>Load</option>
+                <option value="lock" @if(request('type')=='lock') selected @endif>Lock</option>
+                <option value="variance" @if(request('type')=='variance') selected @endif>Variance</option>
+            </select>
+            <button class="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-black">Filter</button>
+        </form>
     </div>
 
-    <div class="rounded-2xl border border-gray-100 bg-white/95 p-4 shadow-sm">
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-xs md:text-sm">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Date</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Depot</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Tank</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Opening</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Expected Opening</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Opening Variance</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Closing</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Expected Closing</th>
-                        <th class="px-3 py-2 text-left font-semibold text-gray-600">Closing Variance</th>
+    <div class="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <table class="min-w-full text-xs text-left">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 font-semibold text-gray-600">Date/Time</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600">User</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600">Depot</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600">Tank</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600">Operation</th>
+                    <th class="px-4 py-2 font-semibold text-gray-600">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($auditEntries as $entry)
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                        <td class="px-4 py-2 whitespace-nowrap">{{ $entry->created_at->format('Y-m-d H:i') }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">{{ $entry->user->name ?? '—' }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">{{ $entry->depot->name ?? '—' }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">{{ $entry->tank ? 'T'.$entry->tank->id : '—' }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 {{
+                                [
+                                    'dip' => 'bg-sky-50 text-sky-700',
+                                    'adjustment' => 'bg-indigo-50 text-indigo-700',
+                                    'offload' => 'bg-emerald-50 text-emerald-700',
+                                    'load' => 'bg-amber-50 text-amber-700',
+                                    'lock' => 'bg-gray-100 text-gray-700',
+                                    'variance' => 'bg-rose-50 text-rose-700',
+                                ][$entry->type] ?? 'bg-gray-50 text-gray-700'
+                            }}">
+                                {{ ucfirst($entry->type) }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-gray-700">{!! $entry->details !!}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach($flaggedDays as $day)
-                        <tr class="border-b border-gray-100 hover:bg-emerald-50/30">
-                            <td class="px-3 py-2">{{ $day->date->toDateString() }}</td>
-                            <td class="px-3 py-2">{{ $day->tank->depot->name }}</td>
-                            <td class="px-3 py-2">T{{ $day->tank->id }} ({{ $day->tank->product->name }})</td>
-                            <td class="px-3 py-2">{{ number_format($day->opening_l_20, 0) }} L</td>
-                            <td class="px-3 py-2">{{ number_format($day->expected_opening_l_20 ?? 0, 0) }} L</td>
-                            <td class="px-3 py-2">
-                                <span class="{{ $day->opening_variance_l_20 > 0 ? 'text-emerald-600' : ($day->opening_variance_l_20 < 0 ? 'text-rose-600' : 'text-gray-900') }}">
-                                    {{ $day->opening_variance_l_20 > 0 ? '+' : '' }}{{ number_format($day->opening_variance_l_20, 0) }} L
-                                </span>
-                            </td>
-                            <td class="px-3 py-2">{{ number_format($day->closing_actual_l_20, 0) }} L</td>
-                            <td class="px-3 py-2">{{ number_format($day->closing_expected_l_20, 0) }} L</td>
-                            <td class="px-3 py-2">
-                                <span class="{{ $day->variance_l_20 > 0 ? 'text-emerald-600' : ($day->variance_l_20 < 0 ? 'text-rose-600' : 'text-gray-900') }}">
-                                    {{ $day->variance_l_20 > 0 ? '+' : '' }}{{ number_format($day->variance_l_20, 0) }} L
-                                    ({{ number_format($day->variance_pct, 2) }}%)
-                                </span>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-        @if($flaggedDays->isEmpty())
-            <div class="mt-6 text-center text-xs text-gray-400">No flagged variances found for the selected period.</div>
-        @endif
+                @empty
+                    <tr>
+                        <td colspan="6" class="px-4 py-6 text-center text-gray-400">No audit entries found for the selected filters.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
     </div>
 </div>
 @endsection
