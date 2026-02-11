@@ -1,0 +1,23 @@
+# Laravel
+/vendor/
+/node_modules/
+/public/storage/
+/storage/*.key
+.env
+.env.*
+/.idea/
+/.vscode/
+
+# Composer
+composer.phar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.cache
+
+# Prevent vendor from being tracked
+vendor/
