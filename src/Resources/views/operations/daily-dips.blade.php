@@ -418,7 +418,7 @@
                             data-note="{{ $closingDip->note ?? '' }}"
                             @if($isLocked) disabled aria-disabled="true" @endif
                             class="mt-4 inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.97]
-                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed hover:bg-emerald-600 active:scale-100 @endif"
+                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed hover:bg-emerald-600 active:100 @endif"
                         >
                             {{ $hasClosing ? 'Edit closing dip' : 'Record closing dip' }}
                         </button>
@@ -431,9 +431,29 @@
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                             Opening @20°
                         </p>
-                        <p class="mt-2 text-xl font-semibold text-gray-900">
-                            {{ $formatLitres($currentDay?->opening_l_20) }}
-                        </p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <span class="text-xl font-semibold text-gray-900">
+                                {{ $formatLitres($currentDay?->opening_l_20) }}
+                            </span>
+                            @if(isset($movementCurrent['opening_variance_flag']) && $movementCurrent['opening_variance_flag'])
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold ml-2" title="Opening differs from previous day's closing">
+                                    <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Opening variance
+                                </span>
+                            @endif
+                        </div>
+                        @if(isset($movementCurrent['opening_balance_prev_closing_l_20']))
+                            <p class="mt-1 text-xs text-gray-500">
+                                <span class="font-medium">Prev closing:</span>
+                                {{ number_format($movementCurrent['opening_balance_prev_closing_l_20'], 0) }} L
+                            </p>
+                        @endif
+                        @if(isset($movementCurrent['opening_variance_flag']) && $movementCurrent['opening_variance_flag'] && isset($movementCurrent['opening_balance_l_20']) && isset($movementCurrent['opening_balance_prev_closing_l_20']))
+                            <p class="mt-1 text-xs text-rose-600">
+                                <span class="font-medium">Variance:</span>
+                                {{ number_format($movementCurrent['opening_balance_l_20'] - $movementCurrent['opening_balance_prev_closing_l_20'], 0) }} L
+                            </p>
+                        @endif
                     </div>
 
                     <div class="rounded-2xl border border-gray-100 bg-white/95 p-4 shadow-sm">
