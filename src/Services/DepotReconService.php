@@ -160,7 +160,7 @@ class DepotReconService
     }
 
     /**
-     * Get expected opening for a day: yesterday's closing dip, fallback to null.
+     * Get expected opening for a day: net sum of all movements up to previous day.
      */
     public function getExpectedOpening(Tank $tank, Carbon $date): ?float
     {
@@ -171,7 +171,17 @@ class DepotReconService
         if ($prevDay && $prevDay->closing_actual_l_20 !== null) {
             return (float) $prevDay->closing_actual_l_20;
         }
-        return null;
+        // Fallback: net sum of all movements up to previous day
+        $offloads = (float) Offload::where('tank_id', $tank->id)
+            ->whereDate('date', '<=', $prevDate->toDateString())
+            ->sum('delivered_20_l');
+        $loads = (float) Load::where('tank_id', $tank->id)
+            ->whereDate('date', '<=', $prevDate->toDateString())
+            ->sum('loaded_20_l');
+        $adjs = (float) Adjustment::where('tank_id', $tank->id)
+            ->whereDate('date', '<=', $prevDate->toDateString())
+            ->sum('amount_20_l');
+        return $offloads - $loads + $adjs;
     }
 
     /**
