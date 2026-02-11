@@ -166,7 +166,7 @@ Route::middleware(['web', 'auth'])
                 ->name('audit');
             // Audit CSV export
             Route::get('/operations/audit/export', [AuditController::class, 'export'])
-                ->name('audit.export');
+                ->name('depot.audit.export');
         });
 
         // ---------------- Dips (Daily tank dips per depot) ----------------
