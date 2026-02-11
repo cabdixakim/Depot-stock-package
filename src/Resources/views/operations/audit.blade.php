@@ -108,7 +108,7 @@ function sortAudit(field) {
 document.getElementById('exportAuditCsv')?.addEventListener('click', function(e) {
     e.preventDefault();
     const url = new URL(window.location.href);
-    url.pathname = '{{ route('depot.audit.export') }}';
+    url.pathname = '{{ route('operations.audit.export') }}';
     window.open(url.toString(), '_blank');
 });
 </script>
