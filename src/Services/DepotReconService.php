@@ -132,7 +132,8 @@ class DepotReconService
 
         $expected = $day->opening_l_20
             + ($totals['in_l_20'] ?? 0.0)
-            - ($totals['out_l_20'] ?? 0.0);
+            - ($totals['out_l_20'] ?? 0.0)
+            + ($totals['adj_l_20'] ?? 0.0);
 
         $day->closing_expected_l_20 = $expected;
     }
@@ -179,7 +180,12 @@ class DepotReconService
      */
     public function flagOpeningVariance(DepotReconDay $day, Tank $tank, Carbon $date): void
     {
-        $expectedOpening = $this->getExpectedOpening($tank, $date);
+        // Calculate expected opening (previous day's closing_actual_l_20)
+        $prevDate = $date->copy()->subDay();
+        $prevDay = DepotReconDay::where('tank_id', $tank->id)
+            ->whereDate('date', $prevDate->toDateString())
+            ->first();
+        $expectedOpening = $prevDay?->closing_actual_l_20;
         if ($expectedOpening === null || $day->opening_l_20 === null) {
             $day->opening_variance_l_20 = null;
             $day->opening_variance_flag = false;
@@ -189,6 +195,22 @@ class DepotReconService
         $day->opening_variance_l_20 = $var;
         // Flag if variance is nonzero (or set a tolerance if needed)
         $day->opening_variance_flag = abs($var) > 0.0;
+    }
+
+    /**
+     * Compute opening balance for a tank and date.
+     * Returns float|null
+     */
+    public function openingBalanceForDay(int $tankId, Carbon $date): ?float
+    {
+        // Opening dip for this day
+        $day = DepotReconDay::where('tank_id', $tankId)
+            ->whereDate('date', $date->toDateString())
+            ->first();
+        if ($day && $day->opening_l_20 !== null) {
+            return (float) $day->opening_l_20;
+        }
+        return null;
     }
 
     /**
@@ -226,10 +248,10 @@ class DepotReconService
             ->whereDate('date', $d)
             ->sum('amount_20_l');
 
-        // Correct logic: offloads = IN, loads = OUT
-        $in  = $offloadsOut;
-        $out = $loadsIn;
-        $net = $offloadsOut - $loadsIn + $adj;
+        // Correct logic: loads = IN, offloads = OUT
+        $in  = $loadsIn;
+        $out = $offloadsOut;
+        $net = $loadsIn - $offloadsOut + $adj;
 
         return [
             'in_l_20'  => round($in, 4),
