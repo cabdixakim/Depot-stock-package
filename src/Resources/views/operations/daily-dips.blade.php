@@ -461,7 +461,17 @@
                             Expected closing @20°
                         </p>
                         <p class="mt-2 text-xl font-semibold text-gray-900">
-                            {{ $formatLitres($currentDay?->closing_expected_l_20) }}
+                            @php
+                                // Show calculation for expected closing: opening + offloads - loads + adjustments
+                                $expectedClosing = null;
+                                if ($currentDay && isset($movementCurrent['offloads_l'], $movementCurrent['loads_l'], $movementCurrent['adj_l_20'])) {
+                                    $expectedClosing = ($currentDay->opening_l_20 ?? 0)
+                                        + ($movementCurrent['offloads_l'] ?? 0)
+                                        - ($movementCurrent['loads_l'] ?? 0)
+                                        + ($movementCurrent['adj_l_20'] ?? 0);
+                                }
+                            @endphp
+                            {{ $formatLitres($expectedClosing) }}
                         </p>
                     </div>
 
