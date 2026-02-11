@@ -196,8 +196,12 @@ class DepotReconService
      *
      * Returns:
      * [
-     *   'in_l_20'  => float,  // loads in + positive adjustments
-     *   'out_l_20' => float,  // offloads out + negative adjustments (absolute)
+     *   'in_l_20'  => float,  // loads in
+     *   'out_l_20' => float,  // offloads out
+     *   'adj_l_20' => float,  // adjustments (signed)
+     *   'loads_l'  => float,  // total loads
+     *   'offloads_l' => float, // total offloads
+     *   'net_l'    => float,  // net movement (loads - offloads + adjustments)
      * ]
      */
     public function movementTotalsForDay(int $tankId, Carbon $date): array
@@ -222,10 +226,10 @@ class DepotReconService
             ->whereDate('date', $d)
             ->sum('amount_20_l');
 
-        // Keep expected formula as: opening + in - out
-        // so we fold adjustments into in/out:
-        $in  = $loadsIn + max(0.0, $adj);
-        $out = $offloadsOut + max(0.0, -$adj);
+        // Correct logic: adjustments should be added to net, not folded into in/out
+        $in  = $loadsIn;
+        $out = $offloadsOut;
+        $net = $loadsIn - $offloadsOut + $adj;
 
         return [
             'in_l_20'  => round($in, 4),
@@ -233,7 +237,7 @@ class DepotReconService
             'adj_l_20' => round($adj, 4),
             'loads_l'  => round($loadsIn, 4),
             'offloads_l' => round($offloadsOut, 4),
-            'net_l'    => round($in - $out, 4),
+            'net_l'    => round($net, 4),
         ];
     }
 }
