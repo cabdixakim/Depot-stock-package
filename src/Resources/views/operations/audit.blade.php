@@ -68,17 +68,17 @@
                         </td>
                         <td class="px-4 py-2 text-gray-700">
                           {!! $entry->details !!}
-                          @if($entry->before_value !== null || $entry->after_value !== null)
+                          @if(property_exists($entry, 'before_value') && $entry->before_value !== null || property_exists($entry, 'after_value') && $entry->after_value !== null)
                             <div class="mt-1 text-[11px] text-gray-500">
-                              @if($entry->before_value !== null)
+                              @if(property_exists($entry, 'before_value') && $entry->before_value !== null)
                                 <span class="mr-2">Before: <b>{{ $entry->before_value }}</b></span>
                               @endif
-                              @if($entry->after_value !== null)
+                              @if(property_exists($entry, 'after_value') && $entry->after_value !== null)
                                 <span>After: <b>{{ $entry->after_value }}</b></span>
                               @endif
                             </div>
                           @endif
-                          @if($entry->note)
+                          @if(property_exists($entry, 'note') && $entry->note)
                             <div class="mt-1 text-[11px] text-amber-700">Note: {{ $entry->note }}</div>
                           @endif
                         </td>
