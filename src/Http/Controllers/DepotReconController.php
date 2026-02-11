@@ -61,6 +61,21 @@ class DepotReconController extends Controller
                     $movementByTank = $tankIds->mapWithKeys(function ($tankId) use ($date) {
                         // Use DepotReconService to get full movement summary including adjustments
                         $totals = $this->recon->movementTotalsForDay($tankId, $date);
+                        // Add expected opening for the day
+                        $tank = Tank::find($tankId);
+                        $expectedOpening = null;
+                        $prevClosing = null;
+                        if ($tank) {
+                            $expectedOpening = $this->recon->getExpectedOpening($tank, $date);
+                            // Previous day's closing dip
+                            $prevDate = $date->copy()->subDay();
+                            $prevDay = \Optima\DepotStock\Models\DepotReconDay::where('tank_id', $tankId)
+                                ->whereDate('date', $prevDate->toDateString())
+                                ->first();
+                            $prevClosing = $prevDay?->closing_actual_l_20;
+                        }
+                        $totals['expected_opening_l_20'] = $expectedOpening;
+                        $totals['opening_balance_prev_closing_l_20'] = $prevClosing;
                         return [$tankId => $totals];
                     });
                 } catch (\Throwable $e) {
