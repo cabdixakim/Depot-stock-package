@@ -431,35 +431,44 @@
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                             Opening @20°
                         </p>
-                        <div class="mt-2 flex items-center gap-2">
+                        <div class="mt-2 flex flex-col gap-1">
                             @php
-                                // Show opening balance, previous closing, and variance if available
+                                // Recorded opening for the day
                                 $openingBalance = $currentDay?->opening_l_20 ?? null;
-                                $prevClosing = $movementCurrent['opening_balance_prev_closing_l_20'] ?? null;
-                                $varianceFlag = $movementCurrent['opening_variance_flag'] ?? false;
+                                // Expected opening for the day (from backend, net sum up to prev day)
+                                $expectedOpening = $movementCurrent['expected_opening_l_20'] ?? null;
+                                // Variance between recorded and expected opening
+                                $openingVariance = ($openingBalance !== null && $expectedOpening !== null)
+                                    ? ($openingBalance - $expectedOpening)
+                                    : null;
                             @endphp
-                            <span class="text-xl font-semibold text-gray-900">
-                                {{ $formatLitres($openingBalance) }}
-                            </span>
-                            @if($varianceFlag)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold ml-2" title="Opening differs from previous day's closing">
-                                    <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    Opening variance
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl font-semibold text-gray-900">
+                                    {{ $formatLitres($openingBalance) }}
                                 </span>
-                            @endif
+                                <span class="text-xs text-gray-400">Recorded</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl font-semibold text-indigo-700">
+                                    {{ $formatLitres($expectedOpening) }}
+                                </span>
+                                <span class="text-xs text-gray-400">Expected</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl font-semibold {{ $openingVariance !== null && $openingVariance >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                    @if($openingVariance !== null)
+                                        {{ $openingVariance >= 0 ? '+' : '' }}{{ number_format($openingVariance, 0) }} L
+                                    @else
+                                        —
+                                    @endif
+                                </span>
+                                <span class="text-xs text-gray-400">Variance</span>
+                            </div>
                         </div>
-                        @if($prevClosing !== null)
-                            <p class="mt-1 text-xs text-gray-500">
-                                <span class="font-medium">Prev closing:</span>
-                                {{ number_format($prevClosing, 0) }} L
-                            </p>
-                        @endif
-                        @if($varianceFlag && $openingBalance !== null && $prevClosing !== null)
-                            <p class="mt-1 text-xs text-rose-600">
-                                <span class="font-medium">Variance:</span>
-                                {{ number_format($openingBalance - $prevClosing, 0) }} L
-                            </p>
-                        @endif
+                        <p class="mt-1 text-xs text-gray-500">
+                            <span class="font-medium">Prev closing:</span>
+                            {{ isset($movementCurrent['opening_balance_prev_closing_l_20']) ? number_format($movementCurrent['opening_balance_prev_closing_l_20'], 0) . ' L' : '—' }}
+                        </p>
                     </div>
 
                     <div class="rounded-2xl border border-gray-100 bg-white/95 p-4 shadow-sm">
