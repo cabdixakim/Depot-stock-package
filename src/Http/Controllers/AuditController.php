@@ -147,7 +147,17 @@ class AuditController extends Controller
         }
 
         // Sort by date/time desc
-        $auditEntries = $entries->sortByDesc('created_at')->values();
+        $sorted = $entries->sortByDesc('created_at')->values();
+        $page = $request->input('page', 1);
+        $perPage = 30;
+        $paged = new \Illuminate\Pagination\LengthAwarePaginator(
+            $sorted->forPage($page, $perPage),
+            $sorted->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+        $auditEntries = $paged;
 
         return view('depot-stock::operations.audit', [
             'auditEntries' => $auditEntries,
