@@ -131,8 +131,8 @@ class DepotReconService
         $totals = $this->movementTotalsForDay($day->tank_id, $date);
 
         $expected = $day->opening_l_20
-            + ($totals['in_l_20'] ?? 0.0)
-            - ($totals['out_l_20'] ?? 0.0)
+            + ($totals['offloads_l'] ?? 0.0)
+            - ($totals['loads_l'] ?? 0.0)
             + ($totals['adj_l_20'] ?? 0.0);
 
         $day->closing_expected_l_20 = $expected;
@@ -218,29 +218,29 @@ class DepotReconService
      *
      * Returns:
      * [
-     *   'in_l_20'  => float,  // loads in
-     *   'out_l_20' => float,  // offloads out
+     *   'in_l_20'  => float,  // offloads in
+     *   'out_l_20' => float,  // loads out
      *   'adj_l_20' => float,  // adjustments (signed)
-     *   'loads_l'  => float,  // total loads
      *   'offloads_l' => float, // total offloads
-     *   'net_l'    => float,  // net movement (loads - offloads + adjustments)
+     *   'loads_l'    => float, // total loads
+     *   'net_l'    => float,  // net movement (offloads - loads + adjustments)
      * ]
      */
     public function movementTotalsForDay(int $tankId, Carbon $date): array
     {
         $d = $date->toDateString();
 
-        // IN: loads into tank
-        $loadsIn = (float) Load::query()
-            ->where('tank_id', $tankId)
-            ->whereDate('date', $d)
-            ->sum('loaded_20_l');
-
-        // OUT: offloads from tank
-        $offloadsOut = (float) Offload::query()
+        // IN: offloads into tank
+        $offloadsIn = (float) Offload::query()
             ->where('tank_id', $tankId)
             ->whereDate('date', $d)
             ->sum('delivered_20_l');
+
+        // OUT: loads from tank
+        $loadsOut = (float) Load::query()
+            ->where('tank_id', $tankId)
+            ->whereDate('date', $d)
+            ->sum('loaded_20_l');
 
         // ADJ: signed (+ adds stock, - reduces stock)
         $adj = (float) Adjustment::query()
@@ -248,18 +248,18 @@ class DepotReconService
             ->whereDate('date', $d)
             ->sum('amount_20_l');
 
-        // Correct logic: loads = IN, offloads = OUT
-        $in  = $loadsIn;
-        $out = $offloadsOut;
-        $net = $loadsIn - $offloadsOut + $adj;
+        // Correct logic: offloads = IN, loads = OUT
+        $in  = $offloadsIn;
+        $out = $loadsOut;
+        $net = $offloadsIn - $loadsOut + $adj;
 
         return [
             'in_l_20'  => round($in, 4),
             'out_l_20' => round($out, 4),
             'adj_l_20' => round($adj, 4),
-            'loads_l'  => round($loadsIn, 4),
-            'offloads_l' => round($offloadsOut, 4),
-            'net_l'    => round($net, 4),
+            'offloads_l' => round($offloadsIn, 4),
+            'loads_l'    => round($loadsOut, 4),
+            'net_l'      => round($net, 4),
         ];
     }
 }
