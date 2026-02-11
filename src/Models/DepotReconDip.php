@@ -33,4 +33,9 @@ class DepotReconDip extends Model
     {
         return $this->belongsTo(DepotReconDay::class, 'recon_day_id');
     }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'created_by_user_id');
+    }
 }
