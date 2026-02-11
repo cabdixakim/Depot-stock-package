@@ -60,13 +60,29 @@ if (confirmBtn) {
                     block.innerHTML = `<span class='text-xs text-gray-700'>Depot pool adjusted for variance on ${depotPoolAdjustData.date} (Tank ${depotPoolAdjustData.tank_id})</span><span class='text-xs font-semibold ${depotPoolAdjustData.variance_l_20 > 0 ? 'text-emerald-600' : 'text-rose-600'}'>Variance: ${depotPoolAdjustData.variance_l_20 > 0 ? '+' : ''}${depotPoolAdjustData.variance_l_20} L</span><span class='text-xs text-gray-500'>by You</span>`;
                 }
             } else {
-                alert(data.message || 'Adjustment failed.');
+                // Show error in modal, not alert
+                let err = document.getElementById('depotPoolAdjustError');
+                if (!err) {
+                    err = document.createElement('div');
+                    err.id = 'depotPoolAdjustError';
+                    err.className = 'mt-2 text-xs text-rose-600';
+                    confirmBtn.parentNode.insertBefore(err, confirmBtn);
+                }
+                err.textContent = data.message || 'Adjustment failed.';
             }
         })
         .catch(() => {
             confirmBtn.disabled = false;
             confirmBtn.textContent = 'Confirm';
-            alert('Error: Could not adjust depot pool.');
+            // Show error in modal, not alert
+            let err = document.getElementById('depotPoolAdjustError');
+            if (!err) {
+                err = document.createElement('div');
+                err.id = 'depotPoolAdjustError';
+                err.className = 'mt-2 text-xs text-rose-600';
+                confirmBtn.parentNode.insertBefore(err, confirmBtn);
+            }
+            err.textContent = 'Error: Could not adjust depot pool.';
         });
     };
 }
