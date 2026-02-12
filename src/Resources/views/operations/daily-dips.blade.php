@@ -376,28 +376,42 @@
                 </div>
 
                 {{-- VARIANCE ADJUSTMENT INFO/BUTTON (above cards) --}}
+                @php
+                    // Find adjustment entry if it exists (already in $adjustEntry from earlier logic)
+                @endphp
                 @if($currentDay && $currentDay->status === 'locked' && isset($currentDay->variance_l_20))
-                  <div class="mt-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/80 p-4 flex items-center gap-4">
-                    <div class="flex-1">
-                      <div class="text-xs font-semibold text-blue-700 flex items-center gap-2">
-                        <svg class="inline h-4 w-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-                        Variance after locking:
-                        <span class="{{ $currentDay->variance_l_20 >= 0 ? 'text-emerald-600' : 'text-rose-600' }} font-bold">
-                          {{ $currentDay->variance_l_20 >= 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L
-                        </span>
-                      </div>
-                      <div class="text-xs text-blue-600 mt-1">
-                        @if($varianceAdjustedBy && isset($adjustEntry))
-                          <span class="font-semibold">Depot pool adjusted by:</span>
+                  @if(isset($adjustEntry) && $adjustEntry)
+                    <div class="mt-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/80 p-4 flex items-center gap-4">
+                      <div class="flex-1">
+                        <div class="text-xs font-semibold text-blue-700 flex items-center gap-2">
+                          <svg class="inline h-4 w-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                          Depot pool adjusted:
+                          <span class="{{ $adjustEntry->volume_20_l >= 0 ? 'text-emerald-600' : 'text-rose-600' }} font-bold">
+                            {{ $adjustEntry->volume_20_l >= 0 ? '+' : '' }}{{ number_format($adjustEntry->volume_20_l, 0) }} L
+                          </span>
+                        </div>
+                        <div class="text-xs text-blue-600 mt-1">
+                          <span class="font-semibold">By:</span>
                           <span class="text-blue-900 font-medium">{{ $varianceAdjustedBy }}</span>
                           <span class="ml-2 text-blue-500">on {{ optional($adjustEntry->created_at)->format('Y-m-d H:i') }}</span>
-                          <span class="ml-2 text-blue-700">Amount: <b>{{ $adjustEntry->volume_20_l >= 0 ? '+' : '' }}{{ number_format($adjustEntry->volume_20_l, 0) }} L</b></span>
-                        @elseif($showVarianceAdjustBtn)
-                          <span class="font-semibold">No adjustment yet.</span>
-                        @endif
+                        </div>
                       </div>
                     </div>
-                    @if($showVarianceAdjustBtn && empty($varianceAdjustedBy))
+                  @elseif($showVarianceAdjustBtn)
+                    <div class="mt-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/80 p-4 flex items-center gap-4">
+                      <div class="flex-1">
+                        <div class="text-xs font-semibold text-blue-700 flex items-center gap-2">
+                          <svg class="inline h-4 w-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                          Variance after locking:
+                          <span class="{{ $currentDay->variance_l_20 >= 0 ? 'text-emerald-600' : 'text-rose-600' }} font-bold">
+                            {{ $currentDay->variance_l_20 >= 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L
+                          </span>
+                        </div>
+                        <div class="text-xs text-blue-600 mt-1">
+                          <span class="font-semibold">No adjustment yet.</span>
+                          <span class="ml-2 text-blue-500">(within {{ $maxDaysOld }} days)</span>
+                        </div>
+                      </div>
                       <button
                         type="button"
                         class="ml-auto px-4 py-2 rounded-full bg-blue-600 text-white text-xs font-semibold shadow-sm hover:bg-blue-700 active:scale-[0.97] transition"
@@ -411,8 +425,8 @@
                       >
                         Adjust Depot Pool
                       </button>
-                    @endif
-                  </div>
+                    </div>
+                  @endif
                 @endif
 
                 {{-- OPENING / CLOSING WIZARD CARDS --}}
@@ -720,7 +734,7 @@
 </div>
 
 {{-- LIGHT CONFIRM MODAL (PATCH) --}}
-<div id="lockConfirmModal" class="hidden fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+<div id="lockConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
     <div class="w-full max-w-sm rounded-2xl border border-white/60 bg-white/95 shadow-2xl">
         <div class="px-5 py-4 border-b border-gray-100">
             <div class="flex items-start gap-3">
