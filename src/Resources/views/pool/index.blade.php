@@ -114,7 +114,7 @@
       </div>
       <div class="hidden sm:block text-right text-[11px] text-gray-500">
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50">
-          <!-- Net (L): <span class="font-semibold {{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }}</span> -->
+          Net (L): <span class="font-semibold {{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }}</span>
         </span>
       </div>
     </form>
@@ -162,7 +162,7 @@
         <span class="text-[11px] text-gray-500">{{ $label }}</span>
       </div>
       <div class="mt-1 text-2xl font-semibold text-gray-900">
-        {{ $fmtL($inAllowance + $posAllow) }} <span class="text-sm text-gray-500">L</span>
+        {{ $fmtL($inAllowance + $posAllow - $negAllow) }} <span class="text-sm text-gray-500">L</span>
       </div>
       <div class="mt-2 flex items-center gap-2 text-[11px] text-gray-600">
         <span class="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
@@ -170,6 +170,9 @@
         </span>
         <span class="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
           + Corr: {{ $fmtL($posAllow) }} L
+        </span>
+        <span class="px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700">
+          - Corr: {{ $fmtL($negAllow) }} L
         </span>
       </div>
     </div>
@@ -222,7 +225,7 @@
             <span class="text-gray-300">•</span>
             <span>Out: {{ $fmtL($decTotal) }} L</span>
             <span class="text-gray-300">•</span>
-            <!-- <span>Net: <b class="{{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }} L</b></span> -->
+            <span>Net: <b class="{{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }} L</b></span>
           </div>
         </div>
       </div>
