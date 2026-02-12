@@ -151,7 +151,7 @@ Route::middleware(['web', 'auth'])
             Route::post('/daily-dips/{depot}/{date}/lock', [DepotReconController::class, 'lockDay'])
                 ->name('daily-dips.lock');
 
-            Route::get('/operations/dips-history', [DepotOperationsController::class, 'dipsHistory'])
+            Route::get('/dips-history', [DepotOperationsController::class, 'dipsHistory'])
              ->name('dips-history');
             // Operations client list (lean)
             Route::get('/clients', [OperationsClientController::class, 'index'])
@@ -159,7 +159,7 @@ Route::middleware(['web', 'auth'])
 
             // Audit view (flagged variances)
             Route::get('/audit', [AuditController::class, 'index'])
-                ->name('operations.audit');
+                ->name('audit');
 
            
             // Audit CSV export
