@@ -173,6 +173,9 @@
         </span>
         <span class="px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700">
           - Corr: {{ $fmtL($negAllow) }} L
+          @if($negAllow > 0)
+            <span class="ml-1 px-1 py-0.5 rounded bg-rose-100 text-rose-700 font-semibold">Subtracted</span>
+          @endif
         </span>
       </div>
     </div>
