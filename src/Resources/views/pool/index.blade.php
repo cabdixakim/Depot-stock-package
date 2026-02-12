@@ -228,7 +228,7 @@
             <span class="text-gray-300">•</span>
             <span>Out: {{ $fmtL($decTotal) }} L</span>
             <span class="text-gray-300">•</span>
-            <span>Net: <b class="{{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }} L</b></span>
+            <span>            git add src/Http/Controllers/DepotPoolController.php ; git commit -m "Pool index: separate positive and negative allowance corrections for allowance_correction (type in/out) in pool breakdown and UI. Show true totals, not just net." ; git push: <b class="{{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }} L</b></span>
           </div>
         </div>
       </div>
