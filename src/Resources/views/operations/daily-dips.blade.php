@@ -375,6 +375,45 @@
                     </div>
                 </div>
 
+                {{-- VARIANCE ADJUSTMENT INFO/BUTTON (above cards) --}}
+                @if($currentDay && $currentDay->status === 'locked' && isset($currentDay->variance_l_20))
+                  <div class="mt-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/80 p-4 flex items-center gap-4">
+                    <div class="flex-1">
+                      <div class="text-xs font-semibold text-blue-700 flex items-center gap-2">
+                        <svg class="inline h-4 w-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                        Variance after locking:
+                        <span class="{{ $currentDay->variance_l_20 >= 0 ? 'text-emerald-600' : 'text-rose-600' }} font-bold">
+                          {{ $currentDay->variance_l_20 >= 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L
+                        </span>
+                      </div>
+                      <div class="text-xs text-blue-600 mt-1">
+                        @if($varianceAdjustedBy)
+                          <span class="font-semibold">Depot pool adjusted by:</span>
+                          <span class="text-blue-900 font-medium">{{ $varianceAdjustedBy }}</span>
+                          <span class="ml-2 text-blue-500">({{ $maxDaysOld }} day window)</span>
+                        @else
+                          <span class="font-semibold">No adjustment yet.</span>
+                        @endif
+                      </div>
+                    </div>
+                    @if($showVarianceAdjustBtn)
+                      <button
+                        type="button"
+                        class="ml-auto px-4 py-2 rounded-full bg-blue-600 text-white text-xs font-semibold shadow-sm hover:bg-blue-700 active:scale-[0.97] transition"
+                        onclick="openDepotPoolAdjustModal({{ $currentDay->variance_l_20 }}, {
+                          depot_id: {{ $currentTank->depot_id }},
+                          tank_id: {{ $currentTank->id }},
+                          product_id: {{ $currentTank->product_id }},
+                          date: '{{ $forDate->toDateString() }}',
+                          variance_l_20: {{ $currentDay->variance_l_20 }}
+                        })"
+                      >
+                        Adjust Depot Pool
+                      </button>
+                    @endif
+                  </div>
+                @endif
+
                 {{-- OPENING / CLOSING WIZARD CARDS --}}
                 <div class="grid gap-4 md:grid-cols-2">
                     {{-- Opening --}}
@@ -534,36 +573,6 @@
                     </div>
                 </div>
 
-                {{-- VARIANCE ADJUSTMENT BUTTON (after day is locked and variance exists) --}}
-                @if($showVarianceAdjustBtn)
-                    <div class="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 flex items-center gap-3">
-                        <div>
-                            <div class="text-xs font-semibold text-emerald-700">
-                                Variance detected after locking: 
-                                <span class="{{ $currentDay->variance_l_20 >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                                    {{ $currentDay->variance_l_20 >= 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L
-                                </span>
-                            </div>
-                            <div class="text-xs text-gray-600 mt-1">
-                                You can adjust the depot pool to account for this variance (within {{ $maxDaysOld }} days).
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            class="ml-auto px-4 py-2 rounded-full bg-emerald-600 text-white text-xs font-semibold shadow-sm hover:bg-emerald-700 active:scale-[0.97]"
-                            onclick="openDepotPoolAdjustModal({{ $currentDay->variance_l_20 }}, {
-                                depot_id: {{ $currentTank->depot_id }},
-                                tank_id: {{ $currentTank->id }},
-                                product_id: {{ $currentTank->product_id }},
-                                date: '{{ $forDate->toDateString() }}',
-                                variance_l_20: {{ $currentDay->variance_l_20 }}
-                            })"
-                        >
-                            Adjust Depot Pool
-                        </button>
-                    </div>
-                @endif
-
                 {{-- MOVEMENTS SUMMARY (structure kept) --}}
                 <div class="rounded-2xl border border-gray-100 bg-white/90 p-5 shadow-sm">
                     <div class="flex items-center justify-between mb-4">
@@ -710,7 +719,7 @@
 </div>
 
 {{-- LIGHT CONFIRM MODAL (PATCH) --}}
-<div id="lockConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+<div id="lockConfirmModal" class="hidden fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm">
     <div class="w-full max-w-sm rounded-2xl border border-white/60 bg-white/95 shadow-2xl">
         <div class="px-5 py-4 border-b border-gray-100">
             <div class="flex items-start gap-3">

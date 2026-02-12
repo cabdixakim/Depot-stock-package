@@ -114,7 +114,7 @@
       </div>
       <div class="hidden sm:block text-right text-[11px] text-gray-500">
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50">
-          Net (L): <span class="font-semibold {{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }}</span>
+          <!-- Net (L): <span class="font-semibold {{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }}</span> -->
         </span>
       </div>
     </form>
@@ -222,7 +222,7 @@
             <span class="text-gray-300">•</span>
             <span>Out: {{ $fmtL($decTotal) }} L</span>
             <span class="text-gray-300">•</span>
-            <span>Net: <b class="{{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }} L</b></span>
+            <!-- <span>Net: <b class="{{ $netWindowL>=0?'text-emerald-700':'text-rose-700' }}">{{ $fmtL($netWindowL) }} L</b></span> -->
           </div>
         </div>
       </div>
