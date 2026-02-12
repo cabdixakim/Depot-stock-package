@@ -376,9 +376,6 @@
                 </div>
 
                 {{-- VARIANCE ADJUSTMENT INFO/BUTTON (above cards) --}}
-                @php
-                    // Find adjustment entry if it exists (already in $adjustEntry from earlier logic)
-                @endphp
                 @if($currentDay && $currentDay->status === 'locked' && isset($currentDay->variance_l_20))
                   @if(isset($adjustEntry) && $adjustEntry)
                     <div class="mt-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/80 p-4 flex items-center gap-4">
@@ -397,7 +394,7 @@
                         </div>
                       </div>
                     </div>
-                  @elseif($showVarianceAdjustBtn)
+                  @elseif(abs($currentDay->variance_l_20) > $varianceTolerance && $daysOld <= $maxDaysOld && $currentDay->variance_l_20 != 0 && !isset($adjustEntry))
                     <div class="mt-6 mb-4 rounded-xl border border-blue-200 bg-blue-50/80 p-4 flex items-center gap-4">
                       <div class="flex-1">
                         <div class="text-xs font-semibold text-blue-700 flex items-center gap-2">
@@ -460,7 +457,7 @@
                             data-note="{{ $openingDip->note ?? '' }}"
                             @if($isLocked) disabled aria-disabled="true" @endif
                             class="mt-4 inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-[0.97]
-                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed hover:bg-indigo-600 active:scale-100 @endif"
+                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed active:scale-100 @endif"
                         >
                             {{ $hasOpening ? 'Edit opening dip' : 'Record opening dip' }}
                         </button>
@@ -495,7 +492,7 @@
                             data-note="{{ $closingDip->note ?? '' }}"
                             @if($isLocked) disabled aria-disabled="true" @endif
                             class="mt-4 inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.97]
-                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed hover:bg-emerald-600 active:100 @endif"
+                                   @if($isLocked) opacity-40 grayscale cursor-not-allowed active:scale-100 @endif"
                         >
                             {{ $hasClosing ? 'Edit closing dip' : 'Record closing dip' }}
                         </button>
@@ -652,7 +649,7 @@
 
 {{-- MODAL --}}
 <div id="dipWizardModal"
-     class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+     class="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm">
     <div class="w-full max-w-lg rounded-2xl border border-white/60 bg-white/95 shadow-2xl">
         <div class="border-b border-gray-100 px-5 py-4">
             <h2 id="dipModalTitle" class="text-base font-semibold text-gray-900">
@@ -734,7 +731,7 @@
 </div>
 
 {{-- LIGHT CONFIRM MODAL (PATCH) --}}
-<div id="lockConfirmModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+<div id="lockConfirmModal" class="fixed inset-0 z-60 flex items-center justify-center bg-black/40 backdrop-blur-sm">
     <div class="w-full max-w-sm rounded-2xl border border-white/60 bg-white/95 shadow-2xl">
         <div class="px-5 py-4 border-b border-gray-100">
             <div class="flex items-start gap-3">
