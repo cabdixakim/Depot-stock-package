@@ -387,16 +387,17 @@
                         </span>
                       </div>
                       <div class="text-xs text-blue-600 mt-1">
-                        @if($varianceAdjustedBy)
+                        @if($varianceAdjustedBy && isset($adjustEntry))
                           <span class="font-semibold">Depot pool adjusted by:</span>
                           <span class="text-blue-900 font-medium">{{ $varianceAdjustedBy }}</span>
-                          <span class="ml-2 text-blue-500">({{ $maxDaysOld }} day window)</span>
-                        @else
+                          <span class="ml-2 text-blue-500">on {{ optional($adjustEntry->created_at)->format('Y-m-d H:i') }}</span>
+                          <span class="ml-2 text-blue-700">Amount: <b>{{ $adjustEntry->volume_20_l >= 0 ? '+' : '' }}{{ number_format($adjustEntry->volume_20_l, 0) }} L</b></span>
+                        @elseif($showVarianceAdjustBtn)
                           <span class="font-semibold">No adjustment yet.</span>
                         @endif
                       </div>
                     </div>
-                    @if($showVarianceAdjustBtn)
+                    @if($showVarianceAdjustBtn && empty($varianceAdjustedBy))
                       <button
                         type="button"
                         class="ml-auto px-4 py-2 rounded-full bg-blue-600 text-white text-xs font-semibold shadow-sm hover:bg-blue-700 active:scale-[0.97] transition"
