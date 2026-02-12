@@ -8,4 +8,5 @@ return [
     // Temperature correction mode: 'simple' (approximation) or 'table' (future hook)
     'vcf_mode' => 'simple',
     'closing_variance_tolerance_pct' => 0.003, // 0.3% tolerance for closing variance
+    'pool_adjust_max_days' => 5,
 ];

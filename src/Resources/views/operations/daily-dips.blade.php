@@ -83,7 +83,7 @@
     $showVarianceAdjustBtn = false;
     $varianceAdjustedBy = null;
     $varianceTolerance = 50; // litres, adjust as needed
-    $maxDaysOld = 5;
+    $maxDaysOld = config('depot-stock.pool_adjust_max_days', 5);
     if ($currentDay && $currentDay->status === 'locked' && isset($currentDay->variance_l_20)) {
         $absVariance = abs($currentDay->variance_l_20);
         $daysOld = \Illuminate\Support\Carbon::parse($forDate)->diffInDays(\Illuminate\Support\Carbon::today());
@@ -533,6 +533,36 @@
                         </p>
                     </div>
                 </div>
+
+                {{-- VARIANCE ADJUSTMENT BUTTON (after day is locked and variance exists) --}}
+                @if($showVarianceAdjustBtn)
+                    <div class="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 flex items-center gap-3">
+                        <div>
+                            <div class="text-xs font-semibold text-emerald-700">
+                                Variance detected after locking: 
+                                <span class="{{ $currentDay->variance_l_20 >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                    {{ $currentDay->variance_l_20 >= 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L
+                                </span>
+                            </div>
+                            <div class="text-xs text-gray-600 mt-1">
+                                You can adjust the depot pool to account for this variance (within {{ $maxDaysOld }} days).
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="ml-auto px-4 py-2 rounded-full bg-emerald-600 text-white text-xs font-semibold shadow-sm hover:bg-emerald-700 active:scale-[0.97]"
+                            onclick="openDepotPoolAdjustModal({{ $currentDay->variance_l_20 }}, {
+                                depot_id: {{ $currentTank->depot_id }},
+                                tank_id: {{ $currentTank->id }},
+                                product_id: {{ $currentTank->product_id }},
+                                date: '{{ $forDate->toDateString() }}',
+                                variance_l_20: {{ $currentDay->variance_l_20 }}
+                            })"
+                        >
+                            Adjust Depot Pool
+                        </button>
+                    </div>
+                @endif
 
                 {{-- MOVEMENTS SUMMARY (structure kept) --}}
                 <div class="rounded-2xl border border-gray-100 bg-white/90 p-5 shadow-sm">
