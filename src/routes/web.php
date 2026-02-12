@@ -166,6 +166,9 @@ Route::middleware(['web', 'auth'])
                 ->name('audit');
             // Audit CSV export
             Route::get('/audit/export', [AuditController::class, 'export'])
+                ->name('audit.export');
+            // Audit CSV export
+            Route::get('/audit/export', [AuditController::class, 'export'])
                 ->name('operations.audit.export');
         });
 
