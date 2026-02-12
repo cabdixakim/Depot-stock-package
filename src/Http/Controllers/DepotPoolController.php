@@ -41,7 +41,8 @@ class DepotPoolController extends Controller
         DB::raw("SUM(CASE WHEN type = 'in'  THEN volume_20_l ELSE 0 END) AS win_in"),
         DB::raw("SUM(CASE WHEN type = 'out' THEN volume_20_l ELSE 0 END) AS win_out"),
         DB::raw("SUM(CASE WHEN ref_type = '".DPE::REF_ALLOWANCE."'          THEN volume_20_l ELSE 0 END) AS in_allowance"),
-        DB::raw("SUM(CASE WHEN ref_type = '".DPE::REF_ALLOWANCE_CORR."'     THEN volume_20_l ELSE 0 END) AS corr_total"),
+        DB::raw("SUM(CASE WHEN ref_type = '".DPE::REF_ALLOWANCE_CORR."' AND type = 'out' THEN volume_20_l ELSE 0 END) AS neg_corr_total"),
+        DB::raw("SUM(CASE WHEN ref_type = '".DPE::REF_ALLOWANCE_CORR."' AND type = 'in' THEN volume_20_l ELSE 0 END) AS pos_corr_total"),
         DB::raw("SUM(CASE WHEN ref_type = '".DPE::REF_ALLOWANCE_REVERSAL."' THEN volume_20_l ELSE 0 END) AS rev_total"),
         DB::raw("SUM(CASE WHEN ref_type = '".DPE::REF_TRANSFER."'           THEN volume_20_l ELSE 0 END) AS out_transfer"),
         DB::raw("SUM(CASE WHEN ref_type = '".DPE::REF_SELL."'               THEN volume_20_l ELSE 0 END) AS out_sell"),
@@ -54,7 +55,8 @@ class DepotPoolController extends Controller
         $total_in   = (float) ($win->win_in       ?? 0);
         $total_out  = (float) ($win->win_out      ?? 0);
         $in_allow   = (float) ($win->in_allowance ?? 0);
-        $corr_total = (float) ($win->corr_total   ?? 0);
+        $neg_corr_total = (float) ($win->neg_corr_total ?? 0);
+        $pos_corr_total = (float) ($win->pos_corr_total ?? 0);
         $rev_total  = (float) ($win->rev_total    ?? 0);
         $out_transfer = (float) ($win->out_transfer ?? 0);
         $out_sell     = (float) ($win->out_sell     ?? 0);
@@ -76,12 +78,12 @@ class DepotPoolController extends Controller
 
         // Canonical breakdown pieces for the view
         $in_allowance = $in_allow;
-        $corr_total_f = $corr_total;
+        $corr_total_f = $neg_corr_total;
         $rev_total_f  = $rev_total;
 
         $in_offloads = $in_allowance;
-        $pos_allow   = max(0, $corr_total_f);
-        $neg_allow   = max(0, -$corr_total_f);
+        $pos_allow   = $pos_corr_total;
+        $neg_allow   = $neg_corr_total;
 
         $pos_dip   = 0.0;
         $pos_other = 0.0;
