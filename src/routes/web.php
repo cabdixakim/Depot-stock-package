@@ -161,9 +161,7 @@ Route::middleware(['web', 'auth'])
             Route::get('/audit', [AuditController::class, 'index'])
                 ->name('operations.audit');
 
-            // Audit view (all-inclusive)
-            Route::get('/operations/audit', [AuditController::class, 'index'])
-                ->name('audit');
+           
             // Audit CSV export
             Route::get('/audit/export', [AuditController::class, 'export'])
                 ->name('audit.export');
