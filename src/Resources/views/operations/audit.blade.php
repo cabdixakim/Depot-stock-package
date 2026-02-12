@@ -11,7 +11,10 @@
             <p class="mt-0.5 text-xs text-gray-500">Comprehensive log of all depot operations: dips, adjustments, offloads, loads, locks, and more.</p>
         </div>
         <form method="GET" class="flex flex-wrap items-center gap-2">
-            <input type="date" name="date" value="{{ request('date', now()->toDateString()) }}" class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800" />
+            <label class="text-xs text-gray-500">From</label>
+            <input type="date" name="from" value="{{ request('from') }}" class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800" />
+            <label class="text-xs text-gray-500">To</label>
+            <input type="date" name="to" value="{{ request('to') }}" class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800" />
             <select name="user" class="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800">
                 <option value="">All users</option>
                 @foreach($users as $user)

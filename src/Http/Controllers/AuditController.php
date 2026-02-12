@@ -23,11 +23,12 @@ class AuditController extends Controller
      */
     public function index(Request $request)
     {
-        $date = $request->input('date');
+        $from = $request->input('from');
+        $to = $request->input('to');
         $userId = $request->input('user');
         $type = $request->input('type');
-        $start = $date ? Carbon::parse($date)->startOfDay() : Carbon::today()->subDays(30);
-        $end = $date ? Carbon::parse($date)->endOfDay() : Carbon::today()->endOfDay();
+        $start = $from ? Carbon::parse($from)->startOfDay() : Carbon::today()->subDays(30);
+        $end = $to ? Carbon::parse($to)->endOfDay() : Carbon::today()->endOfDay();
 
         // Users for filter dropdown
         $userModel = config('auth.providers.users.model', \App\Models\User::class);
@@ -170,11 +171,12 @@ class AuditController extends Controller
      */
     public function export(Request $request)
     {
-        $date = $request->input('date');
+        $from = $request->input('from');
+        $to = $request->input('to');
         $userId = $request->input('user');
         $type = $request->input('type');
-        $start = $date ? Carbon::parse($date)->startOfDay() : Carbon::today()->subDays(30);
-        $end = $date ? Carbon::parse($date)->endOfDay() : Carbon::today()->endOfDay();
+        $start = $from ? Carbon::parse($from)->startOfDay() : Carbon::today()->subDays(30);
+        $end = $to ? Carbon::parse($to)->endOfDay() : Carbon::today()->endOfDay();
 
         $entries = collect();
 
