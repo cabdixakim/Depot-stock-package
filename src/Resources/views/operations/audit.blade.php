@@ -107,11 +107,8 @@ function sortAudit(field) {
 
 document.getElementById('exportAuditCsv')?.addEventListener('click', function(e) {
     e.preventDefault();
-    const url = new URL(window.location.origin + '{{ route('audit.export', [], false) }}');
-    // Copy current filters to export URL
-    for (const [key, value] of new URL(window.location.href).searchParams.entries()) {
-        url.searchParams.set(key, value);
-    }
+    const url = new URL(window.location.href);
+    url.pathname = '{{ route('operations.audit.export') }}';
     window.open(url.toString(), '_blank');
 });
 </script>
