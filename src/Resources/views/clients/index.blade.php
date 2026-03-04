@@ -39,8 +39,7 @@
       @if($canManage)
         <button
           type="button"
-          id="clientCreateOpen"
-          class="sm:hidden inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3 py-2 text-[11px] font-medium hover:bg-black shadow-sm whitespace-nowrap">
+          class="client-create-open sm:hidden inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3 py-2 text-[11px] font-medium hover:bg-black shadow-sm whitespace-nowrap">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M12 5v14M5 12h14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -101,8 +100,7 @@
       @if($canManage)
         <button
           type="button"
-          id="clientCreateOpen"
-          class="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3 py-1.5 text-[11px] font-medium hover:bg-black shadow-sm whitespace-nowrap">
+          class="client-create-open hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 text-white px-3 py-1.5 text-[11px] font-medium hover:bg-black shadow-sm whitespace-nowrap">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M12 5v14M5 12h14" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -930,7 +928,7 @@
 
   // ===== New Client modal =====
   const clientCreateModal = document.getElementById('clientCreateModal');
-  const clientCreateOpen  = document.getElementById('clientCreateOpen');
+  const clientCreateOpens = document.querySelectorAll('.client-create-open');
   const clientCreateCloses = clientCreateModal ? clientCreateModal.querySelectorAll('.client-create-close') : [];
 
   function openClientCreate() {
@@ -944,7 +942,7 @@
     clientCreateModal.classList.remove('flex');
   }
 
-  if (clientCreateOpen) clientCreateOpen.addEventListener('click', openClientCreate);
+  clientCreateOpens.forEach(btn => btn.addEventListener('click', openClientCreate));
   clientCreateCloses.forEach(btn => btn.addEventListener('click', closeClientCreate));
   if (clientCreateModal) {
     clientCreateModal.addEventListener('click', (e) => {
