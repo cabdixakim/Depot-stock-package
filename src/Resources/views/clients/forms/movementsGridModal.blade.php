@@ -515,7 +515,6 @@
         editor: canEdit ? "input" : false,
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
       },
-      // Compliance column just before Reference
       {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
         formatter: complianceFormatter,
         editor:false,
