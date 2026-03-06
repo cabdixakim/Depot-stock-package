@@ -300,7 +300,6 @@
     if (d.clearance_id) {
       label = 'Compliant';
       tooltip = 'Linked to clearance #' + d.clearance_id;
-      // Add TR8 info if available
       if (d.clearance_tr8_number) {
         tooltip += '\nTR8: ' + d.clearance_tr8_number;
       }
@@ -309,11 +308,11 @@
       }
     } else if (d.compliance_bypass_reason) {
       label = 'Bypassed';
-      tooltip = d.compliance_bypass_notes || 'Compliance bypassed';
+      tooltip = (d.compliance_bypass_reason ? d.compliance_bypass_reason + '\n' : '') + (d.compliance_bypass_notes || 'Compliance bypassed');
     }
     // Export-safe: always return plain text for clipboard/export
     if (cell.getTable().options.clipboardCopyFunc || cell.getTable().options.downloadFunc) {
-      return label;
+      return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
     }
     // Otherwise, render badge for UI
     const badge = document.createElement('span');
@@ -443,10 +442,6 @@
         formatter: createdByFormatter,
         editor:false
       },
-      {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
-        formatter: complianceFormatter,
-        editor:false
-      },
     ];
 
     if(currentKind==='loads'){
@@ -474,6 +469,51 @@
         {title:"Trailer", field:"trailer_plate", width:120,
           editor: canEdit ? "input" : false,
           editable: () => canEdit,
+        },
+        // Move Compliance column before Reference/Note
+        {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
+          formatter: complianceFormatter,
+          editor:false,
+          download:true,
+          clipboard:true,
+          accessorDownload: function(value, data){
+            // Build export text with tooltip details
+            let label = 'Not compliant';
+            let tooltip = 'No clearance or bypass reason';
+            if (data.clearance_id) {
+              label = 'Compliant';
+              tooltip = 'Linked to clearance #' + data.clearance_id;
+              if (data.clearance_tr8_number) {
+                tooltip += '\nTR8: ' + data.clearance_tr8_number;
+              }
+              if (data.clearance_tr8_issued_at) {
+                tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
+              }
+            } else if (data.compliance_bypass_reason) {
+              label = 'Bypassed';
+              tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
+            }
+            return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
+          },
+          accessorClipboard: function(value, data){
+            // Same as export
+            let label = 'Not compliant';
+            let tooltip = 'No clearance or bypass reason';
+            if (data.clearance_id) {
+              label = 'Compliant';
+              tooltip = 'Linked to clearance #' + data.clearance_id;
+              if (data.clearance_tr8_number) {
+                tooltip += '\nTR8: ' + data.clearance_tr8_number;
+              }
+              if (data.clearance_tr8_issued_at) {
+                tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
+              }
+            } else if (data.compliance_bypass_reason) {
+              label = 'Bypassed';
+              tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
+            }
+            return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
+          }
         },
         {title:"Reference", field:"reference", width:160,
           editor: canEdit ? "input" : false,
@@ -526,6 +566,49 @@
         editor: canEdit ? "input" : false,
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
       },
+      // Move Compliance column before Reference/Note
+      {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
+        formatter: complianceFormatter,
+        editor:false,
+        download:true,
+        clipboard:true,
+        accessorDownload: function(value, data){
+          let label = 'Not compliant';
+          let tooltip = 'No clearance or bypass reason';
+          if (data.clearance_id) {
+            label = 'Compliant';
+            tooltip = 'Linked to clearance #' + data.clearance_id;
+            if (data.clearance_tr8_number) {
+              tooltip += '\nTR8: ' + data.clearance_tr8_number;
+            }
+            if (data.clearance_tr8_issued_at) {
+              tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
+            }
+          } else if (data.compliance_bypass_reason) {
+            label = 'Bypassed';
+            tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
+          }
+          return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
+        },
+        accessorClipboard: function(value, data){
+          let label = 'Not compliant';
+          let tooltip = 'No clearance or bypass reason';
+          if (data.clearance_id) {
+            label = 'Compliant';
+            tooltip = 'Linked to clearance #' + data.clearance_id;
+            if (data.clearance_tr8_number) {
+              tooltip += '\nTR8: ' + data.clearance_tr8_number;
+            }
+            if (data.clearance_tr8_issued_at) {
+              tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
+            }
+          } else if (data.compliance_bypass_reason) {
+            label = 'Bypassed';
+            tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
+          }
+          return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
+        }
+      },
       {title:"Reference", field:"reference", width:160,
         editor: canEdit ? "input" : false,
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
@@ -535,12 +618,6 @@
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
       },
     ];
-  }
-
-  function refreshColumns(initial=false){
-    if(initial){ return; }
-    if(!tableBuilt){ return; }
-    table.setColumns(buildColumns());
   }
 
   // ===== Data loading =====
