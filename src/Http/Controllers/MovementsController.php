@@ -121,6 +121,15 @@ class MovementsController extends Controller
                 'note'                 => $r->note,
                 'billed_invoice_id'    => $r->billed_invoice_id,
 
+                // Compliance fields
+                'clearance_id'             => $r->clearance_id,
+                'compliance_bypass_reason' => $r->compliance_bypass_reason,
+                'compliance_bypass_notes'  => $r->compliance_bypass_notes,
+
+                // TR8 info for tooltip
+                'clearance_tr8_number'     => optional($r->clearance)->tr8_number,
+                'clearance_tr8_issued_at'  => optional($r->clearance)->tr8_issued_at ? optional($r->clearance)->tr8_issued_at->format('Y-m-d') : null,
+
                 // 🔹 creator info for Tabulator
                 'created_by_id'        => $r->created_by,
                 'created_by_name'      => optional($creator)->name,
