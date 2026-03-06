@@ -436,10 +436,6 @@
         formatter: createdByFormatter,
         editor:false
       },
-      {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
-        formatter: complianceFormatter,
-        editor:false
-      },
     ];
 
     if(currentKind==='loads'){
@@ -518,6 +514,49 @@
       {title:"Trailer", field:"trailer_plate", width:120,
         editor: canEdit ? "input" : false,
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
+      },
+      // Compliance column just before Reference
+      {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
+        formatter: complianceFormatter,
+        editor:false,
+        download:true,
+        clipboard:true,
+        accessorDownload: function(value, data){
+          let label = 'Not compliant';
+          let tooltip = 'No clearance or bypass reason';
+          if (data.clearance_id) {
+            label = 'Compliant';
+            tooltip = 'Linked to clearance #' + data.clearance_id;
+            if (data.clearance_tr8_number) {
+              tooltip += '\nTR8: ' + data.clearance_tr8_number;
+            }
+            if (data.clearance_tr8_issued_at) {
+              tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
+            }
+          } else if (data.compliance_bypass_reason) {
+            label = 'Bypassed';
+            tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
+          }
+          return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
+        },
+        accessorClipboard: function(value, data){
+          let label = 'Not compliant';
+          let tooltip = 'No clearance or bypass reason';
+          if (data.clearance_id) {
+            label = 'Compliant';
+            tooltip = 'Linked to clearance #' + data.clearance_id;
+            if (data.clearance_tr8_number) {
+              tooltip += '\nTR8: ' + data.clearance_tr8_number;
+            }
+            if (data.clearance_tr8_issued_at) {
+              tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
+            }
+          } else if (data.compliance_bypass_reason) {
+            label = 'Bypassed';
+            tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
+          }
+          return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
+        }
       },
       {title:"Reference", field:"reference", width:160,
         editor: canEdit ? "input" : false,
