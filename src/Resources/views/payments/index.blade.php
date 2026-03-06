@@ -135,7 +135,9 @@
                   @endif
                 </td>
                 <td class="px-3 py-3 text-gray-800">{{ $cli->name ?? '—' }}</td>
-                <td class="px-3 py-3 text-gray-700">{{ optional($p->date)->format('Y-m-d') ?? '—' }}</td>
+                <td class="px-3 py-3 text-gray-700">
+                  {{ $p->date ? \Illuminate\Support\Carbon::parse($p->date)->format('Y-m-d') : '—' }}
+                </td>
                 <td class="px-3 py-3 text-right font-semibold text-gray-900">{{ $money($p->amount, $ccyRow) }}</td>
                 <td class="px-3 py-3">
                   <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-800 px-2 py-0.5 text-[11px]">
