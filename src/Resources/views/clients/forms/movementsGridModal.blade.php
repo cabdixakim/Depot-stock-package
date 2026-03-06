@@ -6,7 +6,7 @@
   $isAdmin = in_array('admin', $roleNames) || in_array('owner', $roleNames) || in_array('superadmin', $roleNames);
 @endphp
 
-<div id="movementsModal" class="fixed inset-0 z-140 hidden">
+<div id="movementsModal" class="fixed inset-0 z-[140] hidden">
 
   {{-- Backdrop --}}
   <button type="button" class="absolute inset-0 bg-black/50 backdrop-blur-sm" data-mvm-close aria-label="Close"></button>
@@ -15,7 +15,7 @@
     <div class="w-full max-w-5xl bg-white rounded-2xl shadow-2xl ring-1 ring-gray-200 text-[clamp(12px,1.05vw,14px)]">
 
       {{-- Header --}}
-      <div class="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b bg-linear-to-b from-gray-50 to-white rounded-t-2xl">
+      <div class="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b bg-gradient-to-b from-gray-50 to-white rounded-t-2xl">
         <div class="flex items-center gap-3">
           <div class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">🚚</div>
           <div class="flex items-baseline gap-2">
@@ -72,7 +72,7 @@
         </div>
 
         {{-- Action Bar --}}
-        <div class="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-white/60 px-2.5 py-2 backdrop-blur relative z-300">
+        <div class="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-white/60 px-2.5 py-2 backdrop-blur relative z-[300]">
 
           {{-- Export pills (client-side, Tabulator) --}}
           <div class="inline-flex items-center gap-1">
@@ -102,7 +102,7 @@
           {{-- Save changes (ADMIN ONLY) --}}
           @if($isAdmin)
           <button type="button" id="mvmBtnSave"
-                  class="ml-auto inline-flex items-center gap-2 rounded-md bg-indigo-600 text-white px-3 py-1.5 text-xs hover:bg-indigo-700">
+                  class="ml-auto hidden inline-flex items-center gap-2 rounded-md bg-indigo-600 text-white px-3 py-1.5 text-xs hover:bg-indigo-700">
             Save changes
           </button>
           @endif
@@ -114,7 +114,7 @@
       {{-- Table --}}
       <div class="relative p-3 sm:p-6 pt-2">
         <div id="mvmLoading"
-             class="pointer-events-none absolute inset-3 sm:inset-6 z-250 hidden items-center justify-center rounded-xl bg-white/60 backdrop-blur">
+             class="pointer-events-none absolute inset-3 sm:inset-6 z-[250] hidden items-center justify-center rounded-xl bg-white/60 backdrop-blur">
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle cx="12" cy="12" r="10" stroke-width="2" opacity=".25"/>
@@ -134,7 +134,7 @@
 </div>
 
 {{-- Confirm dialog --}}
-<div id="mvmConfirm" class="fixed inset-0 z-150 hidden">
+<div id="mvmConfirm" class="fixed inset-0 z-[150] hidden">
   <button type="button" class="absolute inset-0 bg-black/40 backdrop-blur-sm" data-cf-cancel></button>
   <div class="absolute inset-0 flex items-center justify-center p-4">
     <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-gray-200">
