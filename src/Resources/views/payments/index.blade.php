@@ -9,20 +9,25 @@
     return $ccy.' '.number_format((float)$v, 2, '.', ',');
   };
 
+  $clientContext = $clientContext ?? null;
   $payments = $payments ?? collect();
-
   $totalAmt = $payments->sum(fn($p)=>(float)($p->amount ?? 0));
-  // If your Payment has a currency column per row, this summary assumes same ccy
   $ccy = count($payments) ? ($payments->first()->currency ?? 'USD') : 'USD';
 @endphp
 
-<div class="min-h-[100dvh] bg-[#F7FAFC]">
+<div class="min-h-dvh bg-[#F7FAFC]">
   {{-- Sticky header --}}
   <div class="sticky top-0 z-20 bg-white/70 backdrop-blur border-b border-gray-100">
     <div class="mx-auto max-w-7xl px-4 md:px-6 h-14 flex items-center justify-between">
       <div class="leading-tight">
         <div class="text-[11px] uppercase tracking-wide text-gray-500">Billing</div>
         <h1 class="font-semibold text-gray-900">Payments</h1>
+        @if($clientContext)
+          <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 px-2.5 py-1 text-[11px] mt-1">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            For: {{ $clientContext->name }}
+          </span>
+        @endif
       </div>
 
       <div class="flex items-center gap-2">
@@ -96,7 +101,7 @@
       {{-- Desktop table --}}
       <div class="hidden md:block overflow-x-auto">
         <table class="min-w-full text-sm">
-          <thead class="bg-gradient-to-b from-gray-50 to-white border-b border-gray-200">
+          <thead class="bg-linear-to-b from-gray-50 to-white border-b border-gray-200">
             <tr>
               <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide">Invoice</th>
               <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide">Client</th>
@@ -208,7 +213,7 @@
 </div>
 
 {{-- ===== New Payment Modal ===== --}}
-<div id="payModal" class="fixed inset-0 z-[120] hidden">
+<div id="payModal" class="fixed inset-0 z-120 hidden">
   <button type="button" class="absolute inset-0 bg-black/50 backdrop-blur-sm" data-pay-close></button>
   <div class="absolute inset-0 flex items-start justify-center p-4 md:p-8 overflow-y-auto">
     <div class="w-full max-w-2xl bg-white rounded-2xl shadow-2xl ring-1 ring-gray-100">
@@ -217,20 +222,40 @@
         <button type="button" class="text-gray-500 hover:text-gray-800" data-pay-close>✕</button>
       </div>
 
-      <form id="payForm" method="POST" action="{{ route('depot.payments.store') }}" class="p-6 space-y-5 text-sm">
+      <form id="payForm" method="POST" action="{{ route('depot.payments.store', $clientContext ? ['client' => $clientContext->id] : null) }}" class="p-6 space-y-5 text-sm">
         @csrf
 
         <div id="payAlert" class="hidden rounded-lg border px-3 py-2 text-sm"></div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
-            <label class="text-xs uppercase tracking-wide text-gray-500">Invoice ID</label>
-            <input name="invoice_id" type="number" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g. 12">
+            <label class="text-xs uppercase tracking-wide text-gray-500">Invoice</label>
+            <select name="invoice_id" id="payInvoiceSelect" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="">— None (Unattached Payment) —</option>
+              @php
+                $invoiceQuery = \Optima\DepotStock\Models\Invoice::with('client')->orderByDesc('date')->limit(100);
+                if ($clientContext) $invoiceQuery->where('client_id', $clientContext->id);
+                $invoices = $invoiceQuery->get();
+              @endphp
+              @foreach($invoices as $inv)
+                <option value="{{ $inv->id }}" data-client="{{ $inv->client_id }}">
+                  [{{ $inv->number }}] {{ optional($inv->client)->name }} | {{ $inv->currency ?? 'USD' }} {{ number_format($inv->total,2) }} | Bal: {{ number_format(max(0,($inv->total-($inv->paid_total??0))),2) }}
+                </option>
+              @endforeach
+            </select>
             <p class="pay-err pay-err-invoice_id hidden text-xs text-rose-600 mt-1"></p>
           </div>
           <div>
-            <label class="text-xs uppercase tracking-wide text-gray-500">Client ID</label>
-            <input name="client_id" type="number" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g. 7">
+            <label class="text-xs uppercase tracking-wide text-gray-500">Client</label>
+            <select name="client_id" id="payClientSelect" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" @if($clientContext) required disabled @else required @endif>
+              <option value="">— Select Client —</option>
+              @php
+                $clients = $clientContext ? [$clientContext] : \Optima\DepotStock\Models\Client::orderBy('name')->get();
+              @endphp
+              @foreach($clients as $cli)
+                <option value="{{ $cli->id }}" @if($clientContext && $cli->id == $clientContext->id) selected @endif>{{ $cli->name }}</option>
+              @endforeach
+            </select>
             <p class="pay-err pay-err-client_id hidden text-xs text-rose-600 mt-1"></p>
           </div>
         </div>
@@ -374,6 +399,26 @@ document.addEventListener('DOMContentLoaded', () => {
       alertEl.textContent = 'Network error. Please try again.';
       alertEl.classList.remove('hidden');
       spinner.classList.add('hidden');
+    }
+  });
+
+  // Payment modal invoice/client logic
+  const invoiceSel = document.getElementById('payInvoiceSelect');
+  const clientSel = document.getElementById('payClientSelect');
+  const clientContextId = {{ $clientContext ? (int)$clientContext->id : 'null' }};
+
+  invoiceSel?.addEventListener('change', function() {
+    const selected = invoiceSel.options[invoiceSel.selectedIndex];
+    const clientId = selected.getAttribute('data-client');
+    if (invoiceSel.value && clientId) {
+      clientSel.value = clientId;
+      clientSel.disabled = true;
+    } else if (clientContextId) {
+      clientSel.value = clientContextId;
+      clientSel.disabled = true;
+    } else {
+      clientSel.disabled = false;
+      clientSel.value = '';
     }
   });
 });
