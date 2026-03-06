@@ -769,6 +769,15 @@
     }
   });
 
+  // ===== Refresh columns (fix for missing function) =====
+  function refreshColumns(initialBuild){
+    if (!table) return;
+    // Only set columns if not initial build
+    if (!initialBuild && tableBuilt) {
+      table.setColumns(buildColumns());
+    }
+  }
+
 })();
 </script>
 @endpush
