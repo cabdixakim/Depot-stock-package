@@ -102,7 +102,7 @@
           {{-- Save changes (ADMIN ONLY) --}}
           @if($isAdmin)
           <button type="button" id="mvmBtnSave"
-                  class="ml-auto inline-flex items-center gap-2 rounded-md bg-indigo-600 text-white px-3 py-1.5 text-xs hover:bg-indigo-700 hidden">
+                  class="ml-auto inline-flex items-center gap-2 rounded-md bg-indigo-600 text-white px-3 py-1.5 text-xs hover:bg-indigo-700">
             Save changes
           </button>
           @endif
@@ -295,33 +295,27 @@
   // Compliance formatter for Tabulator
   function complianceFormatter(cell) {
     const d = cell.getRow().getData();
-    let label = 'Not compliant';
-    let tooltip = 'No clearance or bypass reason';
+    // If clearance_id is present, compliance is met
     if (d.clearance_id) {
-      label = 'Compliant';
-      tooltip = 'Linked to clearance #' + d.clearance_id;
-      if (d.clearance_tr8_number) {
-        tooltip += '\nTR8: ' + d.clearance_tr8_number;
-      }
-      if (d.clearance_tr8_issued_at) {
-        tooltip += '\nIssued: ' + d.clearance_tr8_issued_at;
-      }
-    } else if (d.compliance_bypass_reason) {
-      label = 'Bypassed';
-      tooltip = (d.compliance_bypass_reason ? d.compliance_bypass_reason + '\n' : '') + (d.compliance_bypass_notes || 'Compliance bypassed');
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-xs font-semibold';
+      badge.textContent = 'Compliant';
+      badge.title = 'Linked to clearance #' + d.clearance_id;
+      return badge;
     }
-    // Export-safe: always return plain text for clipboard/export
-    if (cell.getTable().options.clipboardCopyFunc || cell.getTable().options.downloadFunc) {
-      return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
+    // If compliance_bypass_reason is present, show bypass badge
+    if (d.compliance_bypass_reason) {
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-semibold';
+      badge.textContent = 'Bypassed';
+      badge.title = d.compliance_bypass_notes || 'Compliance bypassed';
+      return badge;
     }
-    // Otherwise, render badge for UI
+    // Otherwise, show not compliant
     const badge = document.createElement('span');
-    badge.className =
-      label === 'Compliant' ? 'inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-xs font-semibold'
-      : label === 'Bypassed' ? 'inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-semibold'
-      : 'inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 text-xs font-semibold';
-    badge.textContent = label;
-    badge.title = tooltip;
+    badge.className = 'inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 text-xs font-semibold';
+    badge.textContent = 'Not compliant';
+    badge.title = 'No clearance or bypass reason';
     return badge;
   }
 
@@ -357,12 +351,7 @@
 
   // ===== Table =====
   function ensureTable(){
-    // Destroy previous Tabulator instance if exists
-    if(table){
-      table.destroy();
-      table = null;
-      tableBuilt = false;
-    }
+    if(table) return;
     table = new Tabulator('#mvmTable',{
       layout:'fitDataStretch',
       placeholder:'No rows.',
@@ -370,7 +359,7 @@
       index: 'id',
       columnHeaderVertAlign:"middle",
       columnDefaults:{headerHozAlign:"left",vertAlign:"middle"},
-      columns: buildColumns(),
+      columns: buildColumns(),   // initial columns to avoid setColumns before build
       rowFormatter:function(row){
         const d = row.getData();
         if (currentKind==='offloads' && d.billed_invoice_id){
@@ -425,12 +414,11 @@
         btnSave.classList.remove('hidden');
       }
     });
-    // Hide Save button initially
-    if (btnSave) btnSave.classList.add('hidden');
   }
 
   function buildColumns(){
     const canEdit = IS_ADMIN;
+
     const base = [
       {title:"ID", field:"id", width:70, hozAlign:"right"},
       {title:"Date", field:"date", editor: canEdit ? "input" : false, width:120,
@@ -448,9 +436,13 @@
         formatter: createdByFormatter,
         editor:false
       },
+      {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
+        formatter: complianceFormatter,
+        editor:false
+      },
     ];
+
     if(currentKind==='loads'){
-      // No compliance column for loads
       return [
         ...base,
         {title:"Loaded (L @20°C)", field:"loaded_20_l", width:160, hozAlign:"right",
@@ -486,6 +478,7 @@
         },
       ];
     }
+
     // offloads
     return [
       ...base,
@@ -526,48 +519,6 @@
         editor: canEdit ? "input" : false,
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
       },
-      {title:"Compliance", field:"compliance_status", width:160, hozAlign:"center", headerSort:false,
-        formatter: complianceFormatter,
-        editor:false,
-        download:true,
-        clipboard:true,
-        accessorDownload: function(value, data){
-          let label = 'Not compliant';
-          let tooltip = 'No clearance or bypass reason';
-          if (data.clearance_id) {
-            label = 'Compliant';
-            tooltip = 'Linked to clearance #' + data.clearance_id;
-            if (data.clearance_tr8_number) {
-              tooltip += '\nTR8: ' + data.clearance_tr8_number;
-            }
-            if (data.clearance_tr8_issued_at) {
-              tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
-            }
-          } else if (data.compliance_bypass_reason) {
-            label = 'Bypassed';
-            tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
-          }
-          return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
-        },
-        accessorClipboard: function(value, data){
-          let label = 'Not compliant';
-          let tooltip = 'No clearance or bypass reason';
-          if (data.clearance_id) {
-            label = 'Compliant';
-            tooltip = 'Linked to clearance #' + data.clearance_id;
-            if (data.clearance_tr8_number) {
-              tooltip += '\nTR8: ' + data.clearance_tr8_number;
-            }
-            if (data.clearance_tr8_issued_at) {
-              tooltip += '\nIssued: ' + data.clearance_tr8_issued_at;
-            }
-          } else if (data.compliance_bypass_reason) {
-            label = 'Bypassed';
-            tooltip = (data.compliance_bypass_reason ? data.compliance_bypass_reason + '\n' : '') + (data.compliance_bypass_notes || 'Compliance bypassed');
-          }
-          return label + (tooltip ? ' - ' + tooltip.replace(/\n/g, '; ') : '');
-        }
-      },
       {title:"Reference", field:"reference", width:160,
         editor: canEdit ? "input" : false,
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
@@ -577,6 +528,12 @@
         editable: cell => canEdit && !cell.getRow().getData().billed_invoice_id
       },
     ];
+  }
+
+  function refreshColumns(initial=false){
+    if(initial){ return; }
+    if(!tableBuilt){ return; }
+    table.setColumns(buildColumns());
   }
 
   // ===== Data loading =====
@@ -727,15 +684,6 @@
       cfOk.disabled = false;
     }
   });
-
-  // ===== Refresh columns (fix for missing function) =====
-  function refreshColumns(initialBuild){
-    if (!table) return;
-    // Only set columns if not initial build
-    if (!initialBuild && tableBuilt) {
-      table.setColumns(buildColumns());
-    }
-  }
 
 })();
 </script>
