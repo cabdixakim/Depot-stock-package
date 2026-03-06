@@ -351,7 +351,11 @@
 
   // ===== Table =====
   function ensureTable(){
-    if(table) return;
+    if(table){
+      table.destroy(); // Destroy previous instance to fully rebuild columns
+      table = null;
+      tableBuilt = false;
+    }
     table = new Tabulator('#mvmTable',{
       layout:'fitDataStretch',
       placeholder:'No rows.',
