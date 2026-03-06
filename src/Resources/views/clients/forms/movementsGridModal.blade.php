@@ -345,8 +345,8 @@
     tabs.forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
     currentKind = b.dataset.mvmKind;
-    refreshColumns(false);
-    loadData();
+    ensureTable(); // Rebuild table and columns for new kind
+    loadData();    // Reload data for new kind
   }));
 
   // ===== Table =====
