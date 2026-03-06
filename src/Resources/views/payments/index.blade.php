@@ -256,6 +256,9 @@
                 <option value="{{ $cli->id }}" @if($clientContext && $cli->id == $clientContext->id) selected @endif>{{ $cli->name }}</option>
               @endforeach
             </select>
+            @if($clientContext)
+              <input type="hidden" name="client_id" value="{{ $clientContext->id }}">
+            @endif
             <p class="pay-err pay-err-client_id hidden text-xs text-rose-600 mt-1"></p>
           </div>
         </div>
