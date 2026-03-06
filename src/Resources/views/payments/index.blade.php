@@ -214,8 +214,8 @@
 
 {{-- ===== New Payment Modal ===== --}}
 <div id="payModal" class="fixed inset-0 z-120 hidden">
-  <button type="button" class="absolute inset-0 bg-black/50 backdrop-blur-sm" data-pay-close></button>
-  <div class="absolute inset-0 flex items-start justify-center p-4 md:p-8 overflow-y-auto">
+  <button type="button" class="absolute inset-0 bg-black/50 backdrop-blur-sm" id="payBackdrop" data-pay-close></button>
+  <div class="absolute inset-0 flex items-center justify-center p-4 md:p-8 overflow-y-auto">
     <div class="w-full max-w-2xl bg-white rounded-2xl shadow-2xl ring-1 ring-gray-100">
       <div class="flex items-center justify-between border-b px-6 py-4 bg-gray-50 rounded-t-2xl">
         <h3 class="font-semibold text-gray-900">Record Payment</h3>
@@ -319,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const modal   = document.getElementById('payModal');
   const openBtn = document.getElementById('btnOpenNewPayment');
   const closeEls = modal.querySelectorAll('[data-pay-close]');
+  const backdrop = document.getElementById('payBackdrop');
   const form    = document.getElementById('payForm');
   const spinner = document.getElementById('paySpin');
   const alertEl = document.getElementById('payAlert');
@@ -328,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   openBtn?.addEventListener('click', open);
   closeEls.forEach(el => el.addEventListener('click', close));
+  backdrop?.addEventListener('click', close);
 
   // ------- Simple client-side filter (no backend roundtrip) -------
   const q = document.getElementById('q');
