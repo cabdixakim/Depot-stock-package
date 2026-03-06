@@ -315,7 +315,7 @@
     const badge = document.createElement('span');
     badge.className = 'inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 text-xs font-semibold';
     badge.textContent = 'Not compliant';
-    badge.title = 'No Compliance or bypass reason';
+    badge.title = 'No clearance or bypass reason';
     return badge;
   }
 
@@ -569,8 +569,8 @@
   }
 
   function refreshColumns(initial=false){
-    if(initial){ return; }
     if(!tableBuilt){ return; }
+    // Always rebuild columns for each kind
     table.setColumns(buildColumns());
   }
 
