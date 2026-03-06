@@ -333,7 +333,7 @@
               <option value="">All tanks</option>
               @foreach($tanks as $t)
                 <option value="{{ $t->id }}" @selected(($filters['tank_id'] ?? null) == $t->id)>
-                  {{ $t->depot->name }} — {{ $t->product->name }} (T#{{ $t->id }})
+                  {{ $t->depot->name }} — {{ $t->product->name }} ({{ $t->name ?? 'T#'.$t->id }})
                 </option>
               @endforeach
             </select>
