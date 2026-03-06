@@ -102,7 +102,7 @@
           {{-- Save changes (ADMIN ONLY) --}}
           @if($isAdmin)
           <button type="button" id="mvmBtnSave"
-                  class="ml-auto inline-flex items-center gap-2 rounded-md bg-indigo-600 text-white px-3 py-1.5 text-xs hover:bg-indigo-700">
+                  class="ml-auto inline-flex items-center gap-2 rounded-md bg-indigo-600 text-white px-3 py-1.5 text-xs hover:bg-indigo-700 hidden">
             Save changes
           </button>
           @endif
@@ -357,7 +357,12 @@
 
   // ===== Table =====
   function ensureTable(){
-    if(table) return;
+    // Destroy previous Tabulator instance if exists
+    if(table){
+      table.destroy();
+      table = null;
+      tableBuilt = false;
+    }
     table = new Tabulator('#mvmTable',{
       layout:'fitDataStretch',
       placeholder:'No rows.',
@@ -365,7 +370,7 @@
       index: 'id',
       columnHeaderVertAlign:"middle",
       columnDefaults:{headerHozAlign:"left",vertAlign:"middle"},
-      columns: buildColumns(),   // initial columns to avoid setColumns before build
+      columns: buildColumns(),
       rowFormatter:function(row){
         const d = row.getData();
         if (currentKind==='offloads' && d.billed_invoice_id){
@@ -420,11 +425,12 @@
         btnSave.classList.remove('hidden');
       }
     });
+    // Hide Save button initially
+    if (btnSave) btnSave.classList.add('hidden');
   }
 
   function buildColumns(){
     const canEdit = IS_ADMIN;
-
     const base = [
       {title:"ID", field:"id", width:70, hozAlign:"right"},
       {title:"Date", field:"date", editor: canEdit ? "input" : false, width:120,
@@ -443,8 +449,8 @@
         editor:false
       },
     ];
-
     if(currentKind==='loads'){
+      // No compliance column for loads
       return [
         ...base,
         {title:"Loaded (L @20°C)", field:"loaded_20_l", width:160, hozAlign:"right",
@@ -470,7 +476,6 @@
           editor: canEdit ? "input" : false,
           editable: () => canEdit,
         },
-        // Restore column order for loads (no compliance column)
         {title:"Reference", field:"reference", width:160,
           editor: canEdit ? "input" : false,
           editable: () => canEdit,
@@ -481,7 +486,6 @@
         },
       ];
     }
-
     // offloads
     return [
       ...base,
