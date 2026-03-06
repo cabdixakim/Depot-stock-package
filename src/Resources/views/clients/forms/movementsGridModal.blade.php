@@ -470,6 +470,7 @@
           editor: canEdit ? "input" : false,
           editable: () => canEdit,
         },
+        // Restore column order for loads (no compliance column)
         {title:"Reference", field:"reference", width:160,
           editor: canEdit ? "input" : false,
           editable: () => canEdit,
