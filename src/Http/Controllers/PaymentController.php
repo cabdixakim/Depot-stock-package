@@ -12,19 +12,26 @@ class PaymentController extends Controller
     /**
      * List recent payments (basic).
      */
-    public function index()
+    public function index(Request $request)
     {
-        $payments = Payment::with(['invoice', 'client'])->latest()->limit(100)->get();
-
-        return view('depot-stock::payments.index', compact('payments'));
+        // Support client context from both route and query (?client=ID)
+        $clientId = $request->route('client') ?? $request->query('client');
+        $clientContext = null;
+        $paymentsQuery = Payment::with(['invoice', 'client']);
+        if ($clientId) {
+            $paymentsQuery->where('client_id', $clientId);
+            $clientContext = \Optima\DepotStock\Models\Client::find($clientId);
+        }
+        $payments = $paymentsQuery->latest()->limit(100)->get();
+        return view('depot-stock::payments.index', compact('payments', 'clientContext'));
     }
 
     /**
      * Store a payment and create a ClientCredit if there is overpayment.
      *
      * Expected fields:
-     * - invoice_id (int, exists)
-     * - client_id  (int, exists)
+     * - invoice_id (nullable int, exists)
+     * - client_id  (required_without:invoice_id, int, exists)
      * - date       (date)
      * - amount     (numeric)
      * - mode       (string)  ← NOTE the name is "mode" (not "method")
@@ -35,8 +42,8 @@ class PaymentController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'invoice_id' => 'required|integer|exists:invoices,id',
-            'client_id'  => 'required|integer|exists:clients,id',
+            'invoice_id' => 'nullable|integer|exists:invoices,id',
+            'client_id'  => 'required_without:invoice_id|integer|exists:clients,id',
             'amount'     => 'required|numeric|min:0.01',
             'date'       => 'required|date',
             'mode'       => 'required|string|max:100',
@@ -46,20 +53,24 @@ class PaymentController extends Controller
         ]);
 
         $payload = DB::transaction(function () use ($data) {
+            $invoice = null;
+            if (!empty($data['invoice_id'])) {
+                $invoice = Invoice::lockForUpdate()->findOrFail($data['invoice_id']);
+            }
 
-            /** @var Invoice $invoice */
-            $invoice = Invoice::lockForUpdate()->findOrFail($data['invoice_id']);
+            // If invoice is selected, use its client_id
+            $clientId = $invoice ? $invoice->client_id : $data['client_id'];
 
             // Current balance BEFORE this payment
-            $currentPaid   = (float) ($invoice->paid_total ?? 0);
-            $currentTotal  = (float) ($invoice->total ?? 0);
-            $currentBal    = max(0.0, $currentTotal - $currentPaid);
+            $currentPaid   = $invoice ? (float) ($invoice->paid_total ?? 0) : 0;
+            $currentTotal  = $invoice ? (float) ($invoice->total ?? 0) : 0;
+            $currentBal    = $invoice ? max(0.0, $currentTotal - $currentPaid) : 0;
 
             // Create the payment (full amount)
             /** @var Payment $payment */
             $payment = Payment::create([
-                'invoice_id' => $data['invoice_id'],
-                'client_id'  => $data['client_id'],
+                'invoice_id' => $data['invoice_id'] ?? null,
+                'client_id'  => $clientId,
                 'date'       => $data['date'],
                 'amount'     => (float) $data['amount'],
                 'mode'       => $data['mode'],
@@ -69,13 +80,15 @@ class PaymentController extends Controller
             ]);
 
             // Recalculate invoice after payment
-            $invoice->recalculateTotals(); // updates paid_total, balance, status
+            if ($invoice) {
+                $invoice->recalculateTotals(); // updates paid_total, balance, status
+            }
 
             // Compute overpayment based on the balance BEFORE we applied this payment
-            $overpay = max(0.0, (float)$data['amount'] - $currentBal);
+            $overpay = $invoice ? max(0.0, (float)$data['amount'] - $currentBal) : 0;
 
             $creditCreated = null;
-            if ($overpay > 0.00001) {
+            if ($overpay > 0.00001 && $invoice) {
                 // Record a client credit with remaining=overpay
                 $creditCreated = ClientCredit::create([
                     'client_id'  => $invoice->client_id,
@@ -88,28 +101,19 @@ class PaymentController extends Controller
             }
 
             // ===== NEW: if this is a storage invoice, push litres into ClientStorageCharge =====
-            // We treat any storage charge linked to this invoice as partly/fully "cleared"
-            // based on the paid_total / total ratio.
-            if ($invoice->total > 0) {
+            if ($invoice && $invoice->total > 0) {
                 $ratio = max(0.0, min(1.0, (float)($invoice->paid_total ?? 0) / (float)$invoice->total));
-
                 if ($ratio > 0) {
                     $storageCharges = ClientStorageCharge::where('invoice_id', $invoice->id)->get();
-
                     foreach ($storageCharges as $charge) {
                         $totalLitres = (float) ($charge->total_litres ?? 0);
-
                         $clearedLitres   = $totalLitres * $ratio;
                         $unclearedLitres = max(0.0, $totalLitres - $clearedLitres);
-
                         $charge->cleared_litres   = $clearedLitres;
                         $charge->uncleared_litres = $unclearedLitres;
-
-                        // Only stamp paid_at when the invoice is fully paid
                         if ($ratio >= 0.9999 && empty($charge->paid_at)) {
                             $charge->paid_at = $data['date'];
                         }
-
                         $charge->save();
                     }
                 }
@@ -124,14 +128,14 @@ class PaymentController extends Controller
                     'mode'     => $payment->mode,
                     'date'     => $payment->date,
                 ],
-                'invoice' => [
+                'invoice' => $invoice ? [
                     'id'        => $invoice->id,
                     'number'    => $invoice->number,
                     'status'    => $invoice->status,
                     'total'     => (float) $invoice->total,
                     'paid_total'=> (float) $invoice->paid_total,
                     'balance'   => max(0, (float)$invoice->total - (float)$invoice->paid_total),
-                ],
+                ] : null,
                 'credit'  => $creditCreated ? [
                     'id'        => $creditCreated->id,
                     'amount'    => $creditCreated->amount,
@@ -147,10 +151,16 @@ class PaymentController extends Controller
         }
 
         // Non-AJAX fallback
-        return redirect()
-            ->route('depot.invoices.show', $payload['invoice']['id'])
-            ->with('status', $payload['credit']
-                ? 'Payment recorded and excess saved as client credit.'
-                : 'Payment recorded.');
+        if ($payload['invoice']) {
+            return redirect()
+                ->route('depot.invoices.show', $payload['invoice']['id'])
+                ->with('status', $payload['credit']
+                    ? 'Payment recorded and excess saved as client credit.'
+                    : 'Payment recorded.');
+        } else {
+            return redirect()
+                ->route('depot.payments.index')
+                ->with('status', 'Payment recorded.');
+        }
     }
 }
