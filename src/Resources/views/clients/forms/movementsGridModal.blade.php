@@ -4,6 +4,7 @@
   $u = auth()->user();
   $roleNames = $u?->roles?->pluck('name')->map(fn ($r) => strtolower($r))->all() ?? [];
   $isAdmin = in_array('admin', $roleNames) || in_array('owner', $roleNames) || in_array('superadmin', $roleNames);
+  $depotId = session('depot_id'); // Add depotId from session
 @endphp
 
 <div id="movementsModal" class="fixed inset-0 z-[140] hidden">
@@ -178,6 +179,7 @@
 <script>
 (function(){
   const IS_ADMIN = @json($isAdmin);
+  const DEPOT_ID = @json($depotId); // Expose depotId to JS
 
   // Routes
   const dataUrl = @json(route('depot.clients.movements.data', $client));
@@ -588,6 +590,7 @@
     const elTo=document.getElementById('mvmTo');
     if(elFrom?.value) qs.set('from',elFrom.value);
     if(elTo?.value) qs.set('to',elTo.value);
+    if(DEPOT_ID) qs.set('depot_id', DEPOT_ID); // Add depot_id to query
 
     try{
       const res = await fetch(`${dataUrl}?${qs.toString()}`, { headers:{'Accept':'application/json'} });
