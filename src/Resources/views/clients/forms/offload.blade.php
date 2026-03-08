@@ -200,9 +200,8 @@
           </div>
 
           <div>
-            <label class="font-medium text-gray-700 text-xs uppercase tracking-wide" for="off_tank">Tank</label>
-            <select id="off_tank" name="tank_id"
-                    class="mt-1 rounded-xl border-gray-200 focus:ring-0">
+            <label class="block text-[11px] uppercase tracking-wide text-gray-500">Tank</label>
+            <select name="tank_id" class="mt-1 rounded-xl border-gray-200 focus:ring-0 w-full">
               <option value="">Select tank</option>
               @foreach($tanks as $t)
                 <option value="{{ $t->id }}">

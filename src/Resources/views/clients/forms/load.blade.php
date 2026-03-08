@@ -47,8 +47,8 @@
             <p class="err err-load-date hidden text-xs text-red-600 mt-1"></p>
           </div>
           <div>
-            <label class="font-medium text-gray-700 text-xs uppercase tracking-wide" for="load_tank">Tank</label>
-            <select id="load_tank" name="tank_id" class="mt-1 rounded-xl border-gray-200 focus:ring-0">
+            <label class="block text-[11px] uppercase tracking-wide text-gray-500">Tank</label>
+            <select name="tank_id" class="mt-1 rounded-xl border-gray-200 focus:ring-0 w-full">
               <option value="">Select tank</option>
               @foreach($tanks as $t)
                 <option value="{{ $t->id }}">
