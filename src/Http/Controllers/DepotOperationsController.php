@@ -8,6 +8,9 @@ use Illuminate\Support\Carbon;
 use Optima\DepotStock\Models\DepotReconDay;
 use Optima\DepotStock\Models\Depot;
 use Optima\DepotStock\Models\Tank;
+use Optima\DepotStock\Models\Offload;
+use Optima\DepotStock\Models\Load;
+use Optima\DepotStock\Models\Adjustment;
 
 class DepotOperationsController extends Controller
 {
@@ -115,6 +118,24 @@ class DepotOperationsController extends Controller
             $depot = $tank?->depot;
             $prod  = $tank?->product;
 
+            // Aggregate Offloads (L)
+            $offloadsL = Offload::where('tank_id', $day->tank_id)
+                ->whereDate('date', $day->date)
+                ->sum('delivered_20_l');
+
+            // Aggregate Loads (L)
+            $loadsL = Load::where('tank_id', $day->tank_id)
+                ->whereDate('date', $day->date)
+                ->sum('loaded_20_l');
+
+            // Aggregate Adjustments (L)
+            $adjustmentsL = Adjustment::where('tank_id', $day->tank_id)
+                ->whereDate('date', $day->date)
+                ->sum('amount_20_l');
+
+            // Net (L) = Offloads - Loads + Adjustments
+            $netL = $offloadsL - $loadsL + $adjustmentsL;
+
             return [
                 'id'          => $day->id,
                 'date'        => $day->date instanceof Carbon
@@ -128,9 +149,9 @@ class DepotOperationsController extends Controller
                 'closing_expected_l_20' => (float) ($day->closing_expected_l_20 ?? 0),
                 'closing_actual_l_20'   => (float) ($day->closing_actual_l_20 ?? 0),
 
-                'offloads_l' => (float) ($day->offloads_l ?? 0),
-                'loads_l'    => (float) ($day->loads_l ?? 0),
-                'net_l'      => (float) ($day->net_l ?? 0),
+                'offloads_l' => (float) $offloadsL,
+                'loads_l'    => (float) $loadsL,
+                'net_l'      => (float) $netL,
 
                 'variance_l_20' => (float) ($day->variance_l_20 ?? 0),
                 'variance_pct'  => (float) ($day->variance_pct ?? 0),
