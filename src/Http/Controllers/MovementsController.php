@@ -18,13 +18,25 @@ class MovementsController extends Controller
     public function data(Request $request, Client $client)
     {
         $kind = $request->query('kind', 'offloads'); // 'offloads' | 'loads'
+        
+        // Use depot_id from session if not explicitly passed
+        $depotId = $request->input('depot_id');
+        if (!$depotId) {
+            $depotId = session('depot_id');
+        }
+        // If depotId is still not set, abort or return empty
+        if (!$depotId) {
+            return response()->json(['rows' => []]);
+        }
 
-        $applyFilters = function ($q) use ($request) {
+        $applyFilters = function ($q) use ($request, $depotId) {
             return $q
                 ->when($request->filled('from'), fn($qq) => $qq->whereDate('date', '>=', $request->date('from')))
                 ->when($request->filled('to'),   fn($qq) => $qq->whereDate('date', '<=', $request->date('to')))
                 ->when($request->filled('tank_id'),    fn($qq) => $qq->where('tank_id', (int)$request->input('tank_id')))
-                ->when($request->filled('product_id'), fn($qq) => $qq->where('product_id', (int)$request->input('product_id')));
+                ->when($request->filled('product_id'), fn($qq) => $qq->where('product_id', (int)$request->input('product_id')))
+                // depot filter
+                ->when($depotId, fn($qq) => $qq->whereHas('tank.depot', fn($d) => $d->where('id', $depotId)));
         };
 
         if ($kind === 'loads') {
