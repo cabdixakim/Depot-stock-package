@@ -172,9 +172,18 @@ class ClientController extends Controller
             'to'         => $request->query('to'),
             'tank_id'    => $request->query('tank_id'),
             'product_id' => $request->query('product_id'),
+            'depot_id'   => $request->query('depot_id'),
         ];
 
-        $activeDepotId = session('depot.active_id');
+        // Depot filter logic
+        $depotId = $filters['depot_id'] ?? null;
+        if ($depotId === null || $depotId === '' || $depotId === 'all') {
+            session(['depot.active_id' => null]);
+            $activeDepotId = null;
+        } else {
+            session(['depot.active_id' => $depotId]);
+            $activeDepotId = $depotId;
+        }
 
         // Build base queries then apply filters consistently
         $applyFilters = function ($q) use ($filters, $activeDepotId) {
@@ -261,18 +270,19 @@ class ClientController extends Controller
         $currentStock = $totIn - $totOut + $totAdj - $depotShrink;
 
         // Select options
-        $tanks = Tank::with(['depot','product'])
-            ->where('depot_id', $activeDepotId)
+        $depots = \Optima\DepotStock\Models\Depot::orderBy('name')->get();
+        $tanks = \Optima\DepotStock\Models\Tank::with(['depot','product'])
+            ->when($activeDepotId, fn($q) => $q->where('depot_id', $activeDepotId))
             ->orderBy('id')
             ->get();
-        $products = Product::whereIn('id', function($q) use ($activeDepotId) {
+        $products = \Optima\DepotStock\Models\Product::whereIn('id', function($q) use ($activeDepotId) {
             $q->select('product_id')
               ->from('tanks')
-              ->where('depot_id', $activeDepotId);
+              ->when($activeDepotId, fn($qq) => $qq->where('depot_id', $activeDepotId));
         })->orderBy('name')->get();
 
         return view('depot-stock::clients.show', compact(
-            'client','tanks','products','incoming','outgoing','adjusts',
+            'client','depots','tanks','products','incoming','outgoing','adjusts',
             'totIn','totOut','totAdj','currentStock','filters','loss','lossByProduct'
         ));
     }

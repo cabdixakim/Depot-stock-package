@@ -202,10 +202,12 @@
           <div>
             <label class="font-medium text-gray-700 text-xs uppercase tracking-wide" for="off_tank">Tank</label>
             <select id="off_tank" name="tank_id"
-                    class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-              <option value="">Select tank…</option>
+                    class="mt-1 rounded-xl border-gray-200 focus:ring-0">
+              <option value="">Select tank</option>
               @foreach($tanks as $t)
-                <option value="{{ $t->id }}">{{ $t->depot->name }} — {{ $t->product->name }} (T#{{ $t->id }})</option>
+                <option value="{{ $t->id }}">
+                  {{ $t->depot->name }} — {{ $t->product->name }} ({{ $t->name ?? 'T#'.$t->id }})
+                </option>
               @endforeach
             </select>
             <p class="err err-offload-tank_id hidden text-xs text-red-600 mt-1"></p>

@@ -48,12 +48,11 @@
           </div>
           <div>
             <label class="font-medium text-gray-700 text-xs uppercase tracking-wide" for="load_tank">Tank</label>
-            <select id="load_tank" name="tank_id"
-                    class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-              <option value="">Select tank…</option>
+            <select id="load_tank" name="tank_id" class="mt-1 rounded-xl border-gray-200 focus:ring-0">
+              <option value="">Select tank</option>
               @foreach($tanks as $t)
                 <option value="{{ $t->id }}">
-                  {{ $t->depot->name }} — {{ $t->product->name }} (T#{{ $t->id }})
+                  {{ $t->depot->name }} — {{ $t->product->name }} ({{ $t->name ?? 'T#'.$t->id }})
                 </option>
               @endforeach
             </select>
