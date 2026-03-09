@@ -24,10 +24,7 @@ class MovementsController extends Controller
         if (!$depotId) {
             $depotId = session('depot_id');
         }
-        // If depotId is still not set, abort or return empty
-        if (!$depotId) {
-            return response()->json(['rows' => []]);
-        }
+        // If depotId is still not set, do NOT return empty; show all movements for client
 
         $applyFilters = function ($q) use ($request, $depotId) {
             return $q
