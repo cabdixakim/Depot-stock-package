@@ -177,21 +177,22 @@ class ClientController extends Controller
 
         // Depot filter logic
         $depotId = $filters['depot_id'] ?? null;
-        if ($depotId === null || $depotId === '' || $depotId === 'all') {
-            session(['depot.active_id' => null]);
-            $activeDepotId = null;
-        } else {
+        // Only update session if depot_id is explicitly set and not 'all' or empty
+        if ($depotId !== null && $depotId !== '' && $depotId !== 'all') {
             session(['depot.active_id' => $depotId]);
             $activeDepotId = $depotId;
+        } else {
+            // Do not change session if depot_id is not set or is 'all'
+            $activeDepotId = session('depot.active_id');
         }
 
         // Build base queries then apply filters consistently
         $applyFilters = function ($q) use ($filters, $activeDepotId) {
             return $q
-                ->when($filters['from'], fn($qq, $v) => $qq->whereDate('date', '>=', $v))
-                ->when($filters['to'], fn($qq, $v)   => $qq->whereDate('date', '<=', $v))
-                ->when($filters['tank_id'], fn($qq, $v) => $qq->where('tank_id', $v))
-                ->when($filters['product_id'], fn($qq, $v) => $qq->where('product_id', $v))
+                ->when($filters['from'], fn($qq) => $qq->whereDate('date', '>=', $filters['from']))
+                ->when($filters['to'], fn($qq)   => $qq->whereDate('date', '<=', $filters['to']))
+                ->when($filters['tank_id'], fn($qq) => $qq->where('tank_id', $filters['tank_id']))
+                ->when($filters['product_id'], fn($qq) => $qq->where('product_id', $filters['product_id']))
                 ->when($activeDepotId, fn($qq) => $qq->whereHas('tank', fn($tq) => $tq->where('depot_id', $activeDepotId)));
         };
 
