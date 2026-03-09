@@ -21,7 +21,7 @@ class MovementsController extends Controller
         
         // Always use depot_id from session, ignore request value
         $depotId = session('depot_id');
-        // If depotId is not set or is 'all', show all movements for client
+        // Only filter if depotId is set and numeric
 
         $applyFilters = function ($q) use ($request, $depotId) {
             return $q
@@ -29,8 +29,8 @@ class MovementsController extends Controller
                 ->when($request->filled('to'),   fn($qq) => $qq->whereDate('date', '<=', $request->date('to')))
                 ->when($request->filled('tank_id'),    fn($qq) => $qq->where('tank_id', (int)$request->input('tank_id')))
                 ->when($request->filled('product_id'), fn($qq) => $qq->where('product_id', (int)$request->input('product_id')))
-                // depot filter: only apply if depotId is set and not 'all'
-                ->when($depotId && $depotId !== 'all', fn($qq) => $qq->whereHas('tank.depot', fn($d) => $d->where('id', $depotId)));
+                // depot filter: only apply if depotId is numeric
+                ->when(is_numeric($depotId), fn($qq) => $qq->whereHas('tank.depot', fn($d) => $d->where('id', $depotId)));
         };
 
         if ($kind === 'loads') {
