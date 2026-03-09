@@ -4,7 +4,7 @@
       : substr((string) $tr->date, 0, 10);
 
   $tankLabel = $tr->tank
-      ? ($tr->tank->depot->name.' — '.$tr->tank->product->name.' (T#'.$tr->tank->id.')')
+      ? ($tr->tank->depot->name.' — '.$tr->tank->product->name.' ('.$tr->tank->name ?? 'T#'.$tr->tank->id.')')
       : ('Tank #'.$tr->tank_id);
 
   // try common column names for adjustment amount @20

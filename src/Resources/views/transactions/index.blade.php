@@ -10,7 +10,7 @@
     </select>
   </div>
   <div><label class="text-xs">Depot ID</label><input name="depot_id" class="w-full border rounded p-2" required></div>
-  <div><label class="text-xs">Tank ID</label><input name="tank_id" class="w-full border rounded p-2" required></div>
+  <div><label class="text-xs">Tank</label><input name="tank_id" class="w-full border rounded p-2" required></div>
   <div><label class="text-xs">Product ID</label><input name="product_id" class="w-full border rounded p-2" required></div>
   <div><label class="text-xs">Client ID</label><input name="client_id" class="w-full border rounded p-2"></div>
   <div><label class="text-xs">Truck ID</label><input name="truck_id" class="w-full border rounded p-2"></div>
@@ -31,7 +31,7 @@
 <tr class="border-t">
 <td class="p-2">{{ $t->date }}</td>
 <td class="p-2">{{ $t->type }}</td>
-<td class="p-2">{{ $t->tank_id }}</td>
+<td class="p-2">{{ $t->tank ? ($t->tank->depot->name ?? '') . ' — ' . ($t->tank->product->name ?? '') . ' (' . ($t->tank->name ?? 'T'.$t->tank_id) . ')' : 'T'.$t->tank_id }}</td>
 <td class="p-2">{{ number_format($t->delivered_20,3) }}</td>
 <td class="p-2 text-green-700">{{ number_format($t->allowance_20,3) }}</td>
 </tr>

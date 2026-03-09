@@ -54,7 +54,7 @@
                         <td class="px-4 py-2 whitespace-nowrap">{{ $entry->created_at->format('Y-m-d H:i') }}</td>
                         <td class="px-4 py-2 whitespace-nowrap">{{ $entry->user->name ?? '—' }}</td>
                         <td class="px-4 py-2 whitespace-nowrap">{{ $entry->depot->name ?? '—' }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap">{{ $entry->tank ? 'T'.$entry->tank->id : '—' }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">{{ $entry->tank ? ($entry->tank->name ?? 'T'.$entry->tank->id) : '—' }}</td>
                         <td class="px-4 py-2 whitespace-nowrap">
                             <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 {{
                                 [

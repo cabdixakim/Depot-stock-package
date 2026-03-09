@@ -270,7 +270,7 @@
                         <div class="flex items-center justify-between rounded-xl border border-dashed border-gray-200 bg-gray-50 px-3 py-2">
                             <div class="flex items-center gap-3 min-w-0">
                                 <div class="h-8 w-8 rounded-lg bg-gray-900/5 grid place-content-center text-[11px] font-semibold text-gray-700">
-                                    {{ $tank ? 'T'.$tank->id : '—' }}
+                                    {{ $tank ? ($tank->name ?? 'T'.$tank->id) : '—' }}
                                 </div>
                                 <div class="min-w-0">
                                     <div class="text-[11px] font-medium text-gray-800 truncate">

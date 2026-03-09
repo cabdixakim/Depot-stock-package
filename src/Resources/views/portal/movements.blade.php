@@ -133,10 +133,7 @@
                   <div class="mt-0.5 text-[11px] text-slate-400 flex flex-wrap items-center gap-1">
                     <span>{{ optional($o->date)->format('M d, Y') ?? $o->date }}</span>
                     @if(optional($o->tank)->depot)
-                      <span>· {{ $o->tank->depot->name }}</span>
-                    @endif
-                    @if(optional($o->tank)->product)
-                      <span>· {{ $o->tank->product->name }}</span>
+                      <span>{{ $o->tank->depot->name ?? '' }} — {{ $o->tank->product->name ?? '' }} ({{ $o->tank->name ?? 'T#'.$o->tank_id }})</span>
                     @endif
                   </div>
                 </div>

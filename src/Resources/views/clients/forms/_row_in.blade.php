@@ -27,7 +27,7 @@
       <span class="text-gray-400">•</span>
       <span class="text-[10px] text-gray-600">{{ $depot ?: '—' }}</span>
     </div>
-    <div class="text-[11px] text-gray-400">T#{{ $tankId ?? '—' }}</div>
+    <div class="text-[11px] text-gray-400">{{ $tank->depot->name ?? '' }} — {{ $tank->product->name ?? '' }} ({{ $tank->name ?? 'T#'.$tankId }})</div>
   </td>
 
   {{-- Observed --}}

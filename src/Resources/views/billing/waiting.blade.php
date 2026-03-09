@@ -272,7 +272,7 @@ function render() {
         </td>
         <td class="py-2 px-3">${r.date || ''}</td>
         <td class="py-2 px-3">${r.depot || ''}</td>
-        <td class="py-2 px-3">T#${r.tank || ''}</td>
+        <td class="py-2 px-3">${r.tank_label || (r.tank_depot_name + ' — ' + r.tank_product_name + ' (T#' + r.tank + ')')}</td>
         <td class="py-2 px-3">${r.product || ''}</td>
         <td class="py-2 px-3">${r.truck_plate || '<span class="text-gray-400 italic">–</span>'}</td>
         <td class="py-2 px-3">${r.trailer_plate || '<span class="text-gray-400 italic">–</span>'}</td>
@@ -376,7 +376,7 @@ document.getElementById('openConfirm').addEventListener('click', () => {
       <div class="flex items-center gap-2">
         <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100">${tag}</span>
         <span class="font-medium">${r.product || ''}</span>
-        <span class="text-gray-400">T#${r.tank || ''}</span>
+        <span class="text-gray-400">${r.tank_label || (r.tank_depot_name + ' — ' + r.tank_product_name + ' (T#' + r.tank + ')')}</span>
       </div>
       <div class="tabular-nums">${fmt(r.litres)} L</div>
     </div>`;

@@ -180,10 +180,7 @@
                                     {{ $o->date ? \Illuminate\Support\Carbon::parse($o->date)->format('d M Y') : '—' }}
                                 </td>
                                 <td class="px-3 py-2 text-slate-200">
-                                    {{ optional($o->tank->depot)->name ?? '—' }}
-                                </td>
-                                <td class="px-3 py-2 text-slate-200">
-                                    {{ $o->tank_id ? 'T#'.$o->tank_id : '—' }}
+                                    {{ $o->tank ? ($o->tank->depot->name ?? '') . ' — ' . ($o->tank->product->name ?? '') . ' (' . ($o->tank->name ?? 'T#'.$o->tank_id) . ')' : 'T#'.$o->tank_id }}
                                 </td>
                                 <td class="px-3 py-2 text-slate-200">
                                     {{ optional($o->tank->product)->name ?? '—' }}

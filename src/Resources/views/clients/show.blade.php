@@ -370,7 +370,7 @@
             @endif
             @if (request('tank_id'))
               <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
-                Tank: T#{{ request('tank_id') }}
+                Tank: {{ optional($tanks->find(request('tank_id')))->depot->name ?? '' }} — {{ optional($tanks->find(request('tank_id')))->product->name ?? '' }} ({{ optional($tanks->find(request('tank_id')))->name ?? 'T#'.request('tank_id') }})
               </span>
             @endif
             @if (request('product_id') && isset($products))
@@ -553,7 +553,7 @@
               <div class="px-4 py-3">
                 <div class="flex justify-between text-[12px] text-gray-500">
                   <span>{{ optional($tr->date)->format('d M Y') ?: '—' }}</span>
-                  <span>T#{{ $tr->tank_id }} • {{ $tr->tank->product->name ?? '' }}</span>
+                  <span>{{ $tr->tank ? ($tr->tank->depot->name ?? '') . ' — ' . ($tr->tank->product->name ?? '') . ' (' . ($tr->tank->name ?? 'T#'.$tr->tank_id) . ')' : 'T#'.$tr->tank_id }}</span>
                 </div>
                 <div class="mt-1 flex justify-between">
                   <div class="text-gray-700">
@@ -632,7 +632,7 @@
               <div class="px-4 py-3">
                 <div class="flex justify-between text-[12px] text-gray-500">
                   <span>{{ optional($tr->date)->format('d M Y') ?: '—' }}</span>
-                  <span>T#{{ $tr->tank_id }} • {{ $tr->tank->product->name ?? '' }}</span>
+                  <span>{{ $tr->tank ? ($tr->tank->depot->name ?? '') . ' — ' . ($tr->tank->product->name ?? '') . ' (' . ($tr->tank->name ?? 'T#'.$tr->tank_id) . ')' : 'T#'.$tr->tank_id }}</span>
                 </div>
                 <div class="mt-1 flex justify-between">
                   <div class="text-gray-700">
