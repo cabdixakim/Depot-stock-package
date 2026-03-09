@@ -291,7 +291,7 @@
                                         {{ $tank->depot->name }} — {{ $tank->product->name }}
                                     </p>
                                     <p class="truncate text-[11px] text-gray-500">
-                                        Tank T{{ $tank->id }}
+                                        Tank {{ $tank->name ?? 'T'.$tank->id }}
                                     </p>
                                 </div>
                                 <span class="inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full {{ $dotClass }}"></span>
@@ -320,7 +320,7 @@
                         <div>
                             <h2 class="text-base font-semibold text-gray-900">
                                 {{ $currentTank->depot->name }} — {{ $currentTank->product->name }}
-                                <span class="text-gray-500">(T{{ $currentTank->id }})</span>
+                                <span class="text-gray-500">({{ $currentTank->name ?? 'T'.$currentTank->id }})</span>
                             </h2>
                             <p class="text-[11px] text-gray-500 mt-1">
                                 Opening then closing dips for {{ $forDate->toDateString() }}.
@@ -380,7 +380,7 @@
                 @if($showVarianceAdjustBtn)
                     <div class="w-full mb-4" id="varianceAdjustBlock">
                         <div class="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3">
-                            <span class="text-xs text-gray-700">Locked day for {{ $forDate->toDateString() }} (Tank {{ $currentTank->id }})</span>
+                            <span class="text-xs text-gray-700">Locked day for {{ $forDate->toDateString() }} (Tank {{ $currentTank->name ?? 'T'.$currentTank->id }})</span>
                             <span class="text-xs font-semibold {{ $currentDay->variance_l_20 > 0 ? 'text-emerald-600' : 'text-rose-600' }}">Variance: {{ $currentDay->variance_l_20 > 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L</span>
                             <button type="button" class="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" onclick="openDepotPoolAdjustModal({{ $currentDay->variance_l_20 }}, {
                                 depot_id: {{ $currentTank->depot_id }},
@@ -394,7 +394,7 @@
                 @elseif($varianceAdjustedBy)
                     <div class="w-full mb-4" id="varianceAdjustBlock">
                         <div class="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3">
-                            <span class="text-xs text-gray-700">Depot pool adjusted for variance on {{ $forDate->toDateString() }} (Tank {{ $currentTank->id }})</span>
+                            <span class="text-xs text-gray-700">Depot pool adjusted for variance on {{ $forDate->toDateString() }} (Tank {{ $currentTank->name ?? 'T'.$currentTank->id }})</span>
                             <span class="text-xs font-semibold {{ $currentDay->variance_l_20 > 0 ? 'text-emerald-600' : 'text-rose-600' }}">Variance: {{ $currentDay->variance_l_20 > 0 ? '+' : '' }}{{ number_format($currentDay->variance_l_20, 0) }} L</span>
                             <span class="text-xs text-gray-500">by {{ $varianceAdjustedBy }}</span>
                         </div>
